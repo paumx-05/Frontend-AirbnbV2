@@ -13,6 +13,7 @@ interface VehicleData {
   year: string;
 }
 
+
 export default function VehiclePage({ params }: { params: { licensePlate: string } }) {
   const router = useRouter();
   const [plate, setPlate] = useState(params.licensePlate.toUpperCase());
