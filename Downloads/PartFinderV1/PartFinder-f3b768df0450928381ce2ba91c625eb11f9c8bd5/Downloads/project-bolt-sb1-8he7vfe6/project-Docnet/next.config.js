@@ -6,9 +6,9 @@ const nextConfig = {
   images: { 
     unoptimized: true 
   },
-  // Configuración específica para Netlify
+  // Cambiar de 'export' a 'standalone' para manejar rutas dinámicas
   output: 'standalone',
-  // Configuración para evitar errores de módulos
+  // Configuración mínima para evitar errores de módulos
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -16,11 +16,6 @@ const nextConfig = {
         fs: false,
         net: false,
         tls: false,
-        crypto: false,
-        stream: false,
-        util: false,
-        buffer: false,
-        process: false,
       };
     }
     return config;
