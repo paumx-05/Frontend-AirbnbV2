@@ -390,13 +390,13 @@ export const filterProperties = (
 };
 
 // Función para obtener sugerencias de ubicación
-export const getLocationSuggestions = (searchTerm: string) => {
+export const getLocationSuggestions = (searchTerm: string): Array<{ name: string; country: string; type: 'city' | 'country' | 'region' }> => {
   const cities = ['Madrid', 'Barcelona', 'Valencia'];
   const countries = ['España'];
   
-  const suggestions = [
-    ...cities.map(city => ({ name: city, country: 'España', type: 'city' })),
-    ...countries.map(country => ({ name: country, country: country, type: 'country' }))
+  const suggestions: Array<{ name: string; country: string; type: 'city' | 'country' | 'region' }> = [
+    ...cities.map(city => ({ name: city, country: 'España', type: 'city' as const })),
+    ...countries.map(country => ({ name: country, country: country, type: 'country' as const }))
   ];
 
   return suggestions.filter(suggestion =>

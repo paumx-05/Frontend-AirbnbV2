@@ -21,7 +21,7 @@ interface NotificationSettings {
 interface NotificationData {
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'promo';
 }
 
 export default function ProfileNotificationSettings({ className }: ProfileNotificationSettingsProps) {
