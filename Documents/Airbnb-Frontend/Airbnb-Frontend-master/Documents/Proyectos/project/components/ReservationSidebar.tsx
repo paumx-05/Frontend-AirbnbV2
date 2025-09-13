@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AirbnbProperty } from '@/lib/mockData';
 
 // Interfaz para las props del componente de sidebar de reserva
@@ -13,6 +14,7 @@ const ReservationSidebar = ({ property }: ReservationSidebarProps) => {
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [guests, setGuests] = useState(1);
+  const router = useRouter();
 
   // Función para calcular el precio total basado en fechas y huéspedes
   const calculateTotal = () => {
@@ -39,7 +41,7 @@ const ReservationSidebar = ({ property }: ReservationSidebarProps) => {
     return calculateTotal() + calculateTaxes();
   };
 
-  // Función para manejar la reserva
+  // Función para manejar la reserva - navega al checkout
   const handleReservation = () => {
     if (!checkIn || !checkOut) {
       alert('Por favor selecciona las fechas de check-in y check-out');
@@ -51,8 +53,15 @@ const ReservationSidebar = ({ property }: ReservationSidebarProps) => {
       return;
     }
     
-    // Simular proceso de reserva
-    alert(`¡Reserva realizada! Total: €${calculateFinalTotal()}`);
+    // Navegar al checkout con los datos de la reserva
+    const params = new URLSearchParams({
+      propertyId: property.id,
+      checkIn: checkIn,
+      checkOut: checkOut,
+      guests: guests.toString()
+    });
+    
+    router.push(`/checkout?${params.toString()}`);
   };
 
   // Función para obtener la fecha mínima (hoy)
