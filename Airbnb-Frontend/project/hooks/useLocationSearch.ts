@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDebounce } from './useDebounce';
-import { getLocationSuggestions } from '@/lib/mockData';
+import { propertyService, getLocationSuggestionsFallback } from '@/lib/api/properties';
 
 // Interfaz para las sugerencias de ubicación
 interface LocationSuggestion {
@@ -31,20 +31,34 @@ export function useLocationSearch(searchTerm: string) {
       return;
     }
 
-    // Simular búsqueda con delay
-    setIsLoading(true);
-    
-    const searchTimeout = setTimeout(() => {
-      // Usar la función de mockData para obtener sugerencias
-      const filteredSuggestions = getLocationSuggestions(debouncedSearchTerm);
-
-      setSuggestions(filteredSuggestions);
-      setIsLoading(false);
-    }, 200); // Pequeño delay para simular API call
-
-    return () => {
-      clearTimeout(searchTimeout);
+    const fetchSuggestions = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Intentar obtener sugerencias del backend primero
+        const backendSuggestions = await propertyService.getLocationSuggestions(debouncedSearchTerm);
+        
+        if (backendSuggestions.length > 0) {
+          setSuggestions(backendSuggestions);
+          console.log('✅ [useLocationSearch] Sugerencias del backend:', backendSuggestions.length);
+        } else {
+          // Fallback a sugerencias locales
+          const localSuggestions = getLocationSuggestionsFallback(debouncedSearchTerm);
+          setSuggestions(localSuggestions);
+          console.log('⚠️ [useLocationSearch] Usando sugerencias locales:', localSuggestions.length);
+        }
+      } catch (error) {
+        console.error('💥 [useLocationSearch] Error obteniendo sugerencias:', error);
+        // Fallback a sugerencias locales en caso de error
+        const localSuggestions = getLocationSuggestionsFallback(debouncedSearchTerm);
+        setSuggestions(localSuggestions);
+        console.log('⚠️ [useLocationSearch] Fallback a sugerencias locales:', localSuggestions.length);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
+    fetchSuggestions();
   }, [debouncedSearchTerm]);
 
   // Función para limpiar sugerencias

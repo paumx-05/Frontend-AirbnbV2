@@ -47,6 +47,41 @@ export const authService = {
    */
   async login(email: string, password: string): Promise<AuthResponse> {
     try {
+      // 🚨 MODO DEMO TEMPORAL - Para probar el flujo de cambio de contraseña
+      const DEMO_MODE = process.env.NODE_ENV === 'development';
+      const DEMO_CREDENTIALS = [
+        { email: 'demo@airbnb.com', password: 'demo1234' },
+        { email: 'admin@airbnb.com', password: 'Admin1234!' },
+        { email: 'ana1@gmail.com', password: '123456789' }
+      ];
+      
+      if (DEMO_MODE && DEMO_CREDENTIALS.some(cred => cred.email === email && cred.password === password)) {
+        console.log('🎭 [authService] MODO DEMO ACTIVADO - Simulando login exitoso');
+        
+        const demoUser: User = {
+          id: 'demo-user-123',
+          email: email,
+          name: email.split('@')[0],
+          avatar: undefined,
+          createdAt: new Date().toISOString()
+        };
+        
+        const demoToken = 'demo-jwt-token-' + Date.now();
+        
+        // Guardar token y usuario usando tokenStorage
+        tokenStorage.set(demoToken);
+        localStorage.setItem('user', JSON.stringify(demoUser));
+        
+        console.log('✅ [authService] Login demo exitoso, token y usuario guardados');
+        
+        return {
+          success: true,
+          user: demoUser,
+          token: demoToken,
+          message: 'Login exitoso (modo demo)'
+        };
+      }
+      
       const loginData: LoginRequest = { email, password };
       console.log('🔍 [authService] Enviando datos de login:', loginData);
       

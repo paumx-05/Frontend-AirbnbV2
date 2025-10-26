@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { filterProperties, mockProperties, type AirbnbProperty } from '@/lib/mockData';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { propertyService, type Property } from '@/lib/api/properties';
 
 // Interfaz para los datos de búsqueda
 interface SearchData {
@@ -75,11 +75,33 @@ export const SearchProvider = ({ children }: { children: ReactNode }) => {
     instantBook: false
   });
 
-  // Estado de búsqueda
+  // Estados de propiedades y búsqueda
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Cargar propiedades al inicializar
+  useEffect(() => {
+    const loadProperties = async () => {
+      try {
+        setIsLoading(true);
+        const properties = await propertyService.getAllProperties();
+        setAllProperties(properties);
+        console.log('✅ [SearchContext] Propiedades cargadas:', properties.length);
+      } catch (error) {
+        console.warn('⚠️ [SearchContext] No se pudieron cargar propiedades (endpoint no disponible):', error);
+        // No es un error crítico, solo establecer array vacío
+        setAllProperties([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProperties();
+  }, []);
 
   // Filtrar propiedades basado en los criterios actuales
-  const filteredProperties = filterProperties(mockProperties, {
+  const filteredProperties = propertyService.filterProperties(allProperties, {
     location: searchData.location,
     checkIn: searchData.checkIn,
     checkOut: searchData.checkOut,
@@ -88,14 +110,31 @@ export const SearchProvider = ({ children }: { children: ReactNode }) => {
   });
 
   // Función para realizar búsqueda
-  const performSearch = () => {
+  const performSearch = async () => {
     setIsSearching(true);
     
-    // Simular búsqueda con delay
-    setTimeout(() => {
+    try {
+      // Intentar búsqueda en el backend primero
+      const searchResults = await propertyService.searchProperties({
+        location: searchData.location,
+        checkIn: searchData.checkIn,
+        checkOut: searchData.checkOut,
+        guests: searchData.guests,
+        ...filters
+      });
+      
+      if (searchResults.length > 0) {
+        setAllProperties(searchResults);
+        console.log('✅ [SearchContext] Búsqueda backend exitosa:', searchResults.length);
+      } else {
+        console.log('⚠️ [SearchContext] Sin resultados del backend, usando filtros locales');
+      }
+    } catch (error) {
+      console.error('💥 [SearchContext] Error en búsqueda backend:', error);
+      console.log('⚠️ [SearchContext] Usando filtros locales como fallback');
+    } finally {
       setIsSearching(false);
-      console.log('Búsqueda realizada:', { searchData, filters });
-    }, 1000);
+    }
   };
 
   // Función para limpiar filtros
@@ -119,7 +158,9 @@ export const SearchProvider = ({ children }: { children: ReactNode }) => {
     isSearching,
     setIsSearching,
     performSearch,
-    clearFilters
+    clearFilters,
+    allProperties,
+    isLoading
   };
 
   return (

@@ -36,6 +36,28 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.substring(7);
 
+    // 🚨 MODO DEMO TEMPORAL - Para probar el flujo de cambio de contraseña
+    const DEMO_MODE = process.env.NODE_ENV === 'development';
+    
+    if (DEMO_MODE && token.startsWith('demo-jwt-token-')) {
+      console.log('🎭 [ChangePassword] MODO DEMO ACTIVADO - Simulando cambio de contraseña exitoso');
+      
+      // Simular validación de contraseña actual
+      if (currentPassword.length < 6) {
+        return NextResponse.json({
+          success: false,
+          message: 'La contraseña actual es incorrecta'
+        }, { status: 400 });
+      }
+      
+      // Simular cambio exitoso
+      console.log('✅ [ChangePassword] Contraseña actualizada exitosamente (modo demo)');
+      return NextResponse.json({
+        success: true,
+        message: 'Contraseña actualizada exitosamente (modo demo)'
+      });
+    }
+
     // Llamar al backend real para cambiar la contraseña
     try {
       console.log('🔄 [ChangePassword] Llamando al backend real...');

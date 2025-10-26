@@ -28,6 +28,10 @@ export default function ChangePasswordForm({ className }: ChangePasswordFormProp
   const [success, setSuccess] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  // 🚨 DEBUG: Verificar que el componente se está renderizando
+  console.log('🔍 [ChangePasswordForm] Componente renderizando...');
+  console.log('🔍 [ChangePasswordForm] Usuario:', user?.name);
+
   // Handle form submission with API integration
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();

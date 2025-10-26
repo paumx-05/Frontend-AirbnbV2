@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { ReservationData } from '@/lib/reservation-mock';
+import { ReservationData } from '@/lib/api/reservations';
 
 // Interfaz para items del carrito - reutiliza ReservationData existente
 export interface CartItem extends ReservationData {

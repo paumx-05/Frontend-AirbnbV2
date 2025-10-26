@@ -32,17 +32,18 @@ export default function ResetPasswordDebugger({ token }: ResetPasswordDebuggerPr
       setStep('Paso 2: Verificando conectividad con el backend...');
       
       // Paso 2: Verificar que el backend esté funcionando
-      const healthCheck = await fetch('http://localhost:5000/api/auth/login', {
+      const healthCheck = await fetch('http://localhost:5000/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'test@test.com', password: 'test123' })
+        body: JSON.stringify({ email: 'test@example.com' })
       });
       
       console.log('📥 [ResetPasswordDebugger] Health check:', healthCheck.status);
       
       if (!healthCheck.ok) {
         setStatus('error');
-        setDetails(`❌ Backend no está respondiendo\n\nStatus: ${healthCheck.status}\n\nPosibles causas:\n- Backend no está corriendo en puerto 5000\n- Endpoint /api/auth/login no existe\n- Error de configuración`);
+        const errorText = await healthCheck.text();
+        setDetails(`❌ Backend responde con error\n\nStatus: ${healthCheck.status}\nRespuesta: ${errorText}\n\nPosibles causas:\n- Endpoint /api/auth/forgot-password no disponible\n- Error de configuración del backend\n- Problema de red`);
         return;
       }
       

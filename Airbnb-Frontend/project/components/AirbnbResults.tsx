@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { type AirbnbProperty } from '@/lib/mockData';
+import { type Property } from '@/lib/api/properties';
 import { useSearch } from '@/context/SearchContext';
 
 // Componente para mostrar una tarjeta de propiedad individual
-const PropertyCard = ({ property }: { property: AirbnbProperty }) => {
+const PropertyCard = ({ property }: { property: Property }) => {
   const router = useRouter();
 
   // Función para navegar al detalle de la propiedad

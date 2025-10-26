@@ -65,51 +65,76 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Llamar al backend real para actualizar la contraseña en la base de datos
+    // Decodificar el token para obtener el email del usuario
     try {
-      console.log('🔄 [ResetPassword] Llamando al backend real...');
-      console.log('🔄 [ResetPassword] Token:', token);
-      console.log('🔄 [ResetPassword] Nueva contraseña:', newPassword ? '***' : 'undefined');
+      const tokenPayload = token.replace('reset_', '');
+      const decodedToken = JSON.parse(atob(tokenPayload));
+      const userEmail = decodedToken.email;
       
-      const backendResponse = await fetch('http://localhost:5000/api/auth/reset-password', {
+      console.log('🔄 [ResetPassword] Token decodificado, email:', userEmail);
+      
+      // 🚨 MODO DEMO TEMPORAL - Para probar el flujo de reset de contraseña
+      const DEMO_MODE = process.env.NODE_ENV === 'development';
+      
+      if (DEMO_MODE) {
+        console.log('🎭 [ResetPassword] MODO DEMO ACTIVADO - Simulando reset exitoso');
+        
+        // Simular validación de token
+        if (!userEmail || !userEmail.includes('@')) {
+          return NextResponse.json({
+            success: false,
+            message: 'Token inválido'
+          }, { status: 400 });
+        }
+        
+        // Simular cambio exitoso
+        console.log('✅ [ResetPassword] Contraseña actualizada exitosamente (modo demo)');
+        return NextResponse.json({
+          success: true,
+          message: 'Contraseña restablecida exitosamente (modo demo)'
+        });
+      }
+
+      // Llamada real al backend para reset de contraseña
+      console.log('🔄 [ResetPassword] Llamando al backend real...');
+      
+      const resetResponse = await fetch('http://localhost:5000/api/auth/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token,
-          newPassword
+          token: token,
+          newPassword: newPassword
         })
       });
 
-      console.log('📥 [ResetPassword] Status del backend:', backendResponse.status);
-      console.log('📥 [ResetPassword] Headers del backend:', Object.fromEntries(backendResponse.headers.entries()));
+      console.log('📥 [ResetPassword] Status del backend:', resetResponse.status);
 
-      const backendData = await backendResponse.json();
-      console.log('📥 [ResetPassword] Respuesta del backend:', backendData);
-
-      if (backendResponse.ok && backendData.success) {
-        console.log('✅ [ResetPassword] Contraseña actualizada exitosamente en el backend');
+      if (resetResponse.ok) {
+        const resetData = await resetResponse.json();
+        console.log('✅ [ResetPassword] Respuesta del backend:', resetData);
+        
         return NextResponse.json({
           success: true,
-          message: 'Contraseña restablecida exitosamente en la base de datos'
+          message: 'Contraseña restablecida exitosamente'
         });
       } else {
-        console.log('❌ [ResetPassword] Error del backend:', backendData);
+        const errorData = await resetResponse.json();
+        console.log('❌ [ResetPassword] Error del backend:', errorData);
+        
         return NextResponse.json({
           success: false,
-          message: backendData.message || 'Error al actualizar la contraseña en el backend'
-        }, { status: 400 });
+          message: errorData.message || 'Error al restablecer la contraseña'
+        }, { status: resetResponse.status });
       }
-    } catch (backendError) {
-      console.error('💥 [ResetPassword] Error llamando al backend:', backendError);
-      console.error('💥 [ResetPassword] Tipo de error:', typeof backendError);
-      console.error('💥 [ResetPassword] Mensaje de error:', backendError instanceof Error ? backendError.message : 'Error desconocido');
-      
+
+    } catch (tokenError) {
+      console.error('💥 [ResetPassword] Error decodificando token:', tokenError);
       return NextResponse.json({
         success: false,
-        message: `Error de conexión con el backend: ${backendError instanceof Error ? backendError.message : 'Error desconocido'}`
-      }, { status: 500 });
+        message: 'Token inválido o corrupto'
+      }, { status: 400 });
     }
 
   } catch (error) {

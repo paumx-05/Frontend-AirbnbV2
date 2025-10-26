@@ -198,7 +198,11 @@ export default function ProfilePage() {
             <div className="space-y-6">
               <ProfileEditForm />
               <AvatarUploader />
-              <ChangePasswordForm />
+              {/* 🚨 DEBUG: Verificar que el componente se está importando */}
+              <div style={{border: '2px solid red', padding: '10px', margin: '10px'}}>
+                <h3 style={{color: 'red'}}>DEBUG: ChangePasswordForm debería estar aquí</h3>
+                <ChangePasswordForm />
+              </div>
             </div>
 
             {/* Notification Settings */}

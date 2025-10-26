@@ -19,10 +19,10 @@ export default function BackendEndpointTester() {
       
       // Paso 1: Verificar que el backend esté funcionando
       setStep('Paso 1: Verificando que el backend esté funcionando...');
-      const healthCheck = await fetch('http://localhost:5000/api/auth/login', {
+      const healthCheck = await fetch('http://localhost:5000/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'test@test.com', password: 'test123' })
+        body: JSON.stringify({ email: 'test@example.com' })
       });
       
       console.log('📥 [BackendEndpointTester] Health check:', healthCheck.status);

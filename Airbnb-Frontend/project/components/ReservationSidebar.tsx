@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AirbnbProperty } from '@/lib/mockData';
+import { Property } from '@/lib/api/properties';
 import { useReservationCart } from '@/context/ReservationCartContext';
 
 // Interfaz para las props del componente de sidebar de reserva
 interface ReservationSidebarProps {
-  property: AirbnbProperty;
+  property: Property;
 }
 
 // Componente de sidebar de reserva y disponibilidad
