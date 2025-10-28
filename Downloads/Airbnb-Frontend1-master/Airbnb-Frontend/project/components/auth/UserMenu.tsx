@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useIsAdmin } from '@/hooks/useAdminRole';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
@@ -20,15 +21,17 @@ import {
   Calendar, 
   LogOut, 
   Menu,
-  Loader2 
+  Loader2,
+  Shield
 } from 'lucide-react';
 
 export default function UserMenu() {
   const { user, logout, isLoading, isAuthenticated } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isAdmin = useIsAdmin(); // Hook para verificar si el usuario es admin
 
   // Log temporal para debugging
-  console.log('🔍 [UserMenu] Renderizando con isAuthenticated:', isAuthenticated, 'user:', user?.name);
+  console.log('🔍 [UserMenu] Renderizando con isAuthenticated:', isAuthenticated, 'user:', user?.name, 'isAdmin:', isAdmin);
 
   if (!user) {
     console.log('🔍 [UserMenu] No hay usuario, no renderizando');
@@ -112,6 +115,16 @@ export default function UserMenu() {
           <Settings className="h-4 w-4" />
           <span>Configuración</span>
         </DropdownMenuItem>
+        
+        {/* Enlace al Panel de Admin - Solo visible para usuarios admin */}
+        {isAdmin && (
+          <Link href="/admin">
+            <DropdownMenuItem className="flex items-center space-x-2 cursor-pointer hover:bg-slate-700">
+              <Shield className="h-4 w-4" />
+              <span>Panel de Admin</span>
+            </DropdownMenuItem>
+          </Link>
+        )}
         
         <DropdownMenuSeparator className="bg-slate-700" />
         

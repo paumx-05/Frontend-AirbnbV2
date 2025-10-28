@@ -2,54 +2,57 @@
 
 import { useState, useEffect } from 'react';
 import { adminService } from '@/lib/api/admin';
+import { type UserMetrics } from '@/schemas/admin';
+import { useTelemetry } from '@/lib/telemetry/admin';
 import MetricCard from '@/components/admin/MetricCard';
 import UserChart from '@/components/admin/UserChart';
 import ActivityChart from '@/components/admin/ActivityChart';
 import UserTable from '@/components/admin/UserTable';
 import ExecutiveSummary from '@/components/admin/ExecutiveSummary';
 
-interface UserMetrics {
-  totalUsers: number;
-  activeUsers: number;
-  inactiveUsers: number;
-  verifiedUsers: number;
-  unverifiedUsers: number;
-  newUsersToday: number;
-  newUsersThisWeek: number;
-  newUsersThisMonth: number;
-  registrationGrowth: number;
-  lastUpdated: string;
-}
-
 const AdminDashboard = () => {
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { logApiCall, logError, logUserAction } = useTelemetry();
 
   // Cargar métricas al montar el componente
   useEffect(() => {
     const loadMetrics = async () => {
+      const startTime = Date.now();
       try {
         setIsLoading(true);
         setError(null);
         
+        logUserAction('dashboard_load_start');
+        
         const response = await adminService.getUserMetrics();
+        const duration = Date.now() - startTime;
         
         if (response.success && response.data) {
           setMetrics(response.data);
+          logApiCall('/api/users/stats', duration, 'success');
+          logUserAction('dashboard_load_success', { 
+            totalUsers: response.data.totalUsers 
+          });
         } else {
           setError(response.message || 'Error cargando métricas');
+          logApiCall('/api/users/stats', duration, 'error');
+          logError('AdminDashboard', response.message || 'Error cargando métricas');
         }
       } catch (error) {
+        const duration = Date.now() - startTime;
         console.error('Error cargando métricas:', error);
         setError('Error de conexión con el servidor');
+        logApiCall('/api/users/stats', duration, 'error');
+        logError('AdminDashboard', 'Error de conexión con el servidor', { error: error instanceof Error ? error.message : 'Unknown error' });
       } finally {
         setIsLoading(false);
       }
     };
 
     loadMetrics();
-  }, []);
+  }, []); // Eliminar dependencias para evitar bucle infinito
 
   // Mostrar loading
   if (isLoading) {
@@ -79,7 +82,34 @@ const AdminDashboard = () => {
         <h3 className="text-lg font-medium text-gray-900 mb-2">Error cargando métricas</h3>
         <p className="text-gray-600 mb-4">{error}</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            setIsLoading(true);
+            setError(null);
+            // Recargar métricas sin usar useEffect
+            const loadMetrics = async () => {
+              const startTime = Date.now();
+              try {
+                const response = await adminService.getUserMetrics();
+                const duration = Date.now() - startTime;
+                
+                if (response.success && response.data) {
+                  setMetrics(response.data);
+                  logApiCall('/api/users/stats', duration, 'success');
+                } else {
+                  setError(response.message || 'Error cargando métricas');
+                  logApiCall('/api/users/stats', duration, 'error');
+                }
+              } catch (error) {
+                const duration = Date.now() - startTime;
+                console.error('Error cargando métricas:', error);
+                setError('Error de conexión con el servidor');
+                logApiCall('/api/users/stats', duration, 'error');
+              } finally {
+                setIsLoading(false);
+              }
+            };
+            loadMetrics();
+          }}
           className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
         >
           Reintentar

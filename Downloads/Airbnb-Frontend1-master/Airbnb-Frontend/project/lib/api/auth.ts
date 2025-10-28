@@ -11,6 +11,7 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
+  role?: string; // Campo para el rol del usuario (admin, user, etc.)
   createdAt: string;
 }
 
@@ -63,6 +64,7 @@ export const authService = {
           email: email,
           name: email.split('@')[0],
           avatar: undefined,
+          role: email.includes('admin') ? 'admin' : 'user', // Asignar rol según email
           createdAt: new Date().toISOString()
         };
         

@@ -2,17 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { adminService } from '@/lib/api/admin';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  isActive: boolean;
-  isVerified: boolean;
-  createdAt: string;
-  lastLogin?: string;
-}
+import { type User } from '@/schemas/admin';
 
 const UserTable = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -33,43 +23,16 @@ const UserTable = () => {
         setUsers(response.data.users || []);
         setTotalPages(response.data.totalPages || 1);
       } else {
-        // Datos de ejemplo si no hay respuesta del servidor
-        setUsers(generateMockUsers());
-        setTotalPages(3);
+        setError(response.message || 'Error cargando usuarios');
+        setUsers([]);
       }
     } catch (error) {
       console.error('Error cargando usuarios:', error);
-      setError('Error cargando usuarios');
-      setUsers(generateMockUsers());
+      setError('Error de conexión con el servidor');
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Generar usuarios de ejemplo
-  const generateMockUsers = (): User[] => {
-    const mockUsers: User[] = [];
-    const names = ['Juan Pérez', 'María García', 'Carlos López', 'Ana Martínez', 'Luis Rodríguez'];
-    const roles = ['user', 'admin'];
-    
-    for (let i = 0; i < 10; i++) {
-      const randomName = names[Math.floor(Math.random() * names.length)];
-      const randomRole = roles[Math.floor(Math.random() * roles.length)];
-      const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
-      
-      mockUsers.push({
-        id: `user-${i + 1}`,
-        name: randomName,
-        email: `usuario${i + 1}@ejemplo.com`,
-        role: randomRole,
-        isActive: Math.random() > 0.2,
-        isVerified: Math.random() > 0.3,
-        createdAt: createdAt.toISOString(),
-        lastLogin: Math.random() > 0.4 ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : undefined
-      });
-    }
-    
-    return mockUsers;
   };
 
   // Cargar usuarios al montar el componente
@@ -165,13 +128,13 @@ const UserTable = () => {
                   <div className="flex-shrink-0 h-10 w-10">
                     <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
                       <span className="text-sm font-medium text-gray-700">
-                        {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        {`${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()}
                       </span>
                     </div>
                   </div>
                   <div className="ml-4">
                     <div className="text-sm font-medium text-gray-900">
-                      {user.name}
+                      {`${user.firstName} ${user.lastName}`}
                     </div>
                     <div className="text-sm text-gray-500">
                       {user.email}

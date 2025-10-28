@@ -4,64 +4,23 @@
  */
 
 import { apiClient } from './config';
+import { 
+  UserMetricsSchema, 
+  UsersListSchema, 
+  UserStatsSchema, 
+  ActivityMetricsSchema,
+  AdminRoleSchema,
+  AdminResponseSchema,
+  type UserMetrics,
+  type UsersList,
+  type UserStats,
+  type ActivityMetrics,
+  type AdminRole,
+  type AdminResponse
+} from '@/schemas/admin';
 
-// Interfaces para métricas de administración
-export interface UserMetrics {
-  totalUsers: number;
-  activeUsers: number;
-  inactiveUsers: number;
-  verifiedUsers: number;
-  unverifiedUsers: number;
-  newUsersToday: number;
-  newUsersThisWeek: number;
-  newUsersThisMonth: number;
-  registrationGrowth: number;
-  lastUpdated: string;
-}
-
-export interface RegistrationStats {
-  date: string;
-  count: number;
-}
-
-export interface ActivityMetrics {
-  totalLogins: number;
-  loginsToday: number;
-  loginsThisWeek: number;
-  loginsThisMonth: number;
-  averageSessionDuration: number;
-  mostActiveHour: number;
-}
-
-export interface UserStats {
-  totalUsers: number;
-  usersByStatus: {
-    active: number;
-    inactive: number;
-  };
-  usersByVerification: {
-    verified: number;
-    unverified: number;
-  };
-  usersByGender: {
-    male: number;
-    female: number;
-    other: number;
-  };
-  usersByAgeGroup: {
-    '18-25': number;
-    '26-35': number;
-    '36-45': number;
-    '46-55': number;
-    '55+': number;
-  };
-}
-
-export interface AdminResponse {
-  success: boolean;
-  data?: any;
-  message?: string;
-}
+// Re-exportar tipos desde schemas para compatibilidad
+export type { UserMetrics, UsersList, UserStats, ActivityMetrics, AdminRole, AdminResponse };
 
 /**
  * Servicios de administración para métricas de usuarios
@@ -77,15 +36,47 @@ export const adminService = {
       
       const response = await apiClient.get<AdminResponse>('/api/users/stats');
       
-      if (response.success) {
-        console.log('✅ [adminService] Métricas obtenidas:', response.data);
-      } else {
-        console.log('❌ [adminService] Error obteniendo métricas:', response.message);
-      }
+      // Validar respuesta con Zod
+      const validatedResponse = AdminResponseSchema.parse(response);
       
-      return response;
+      if (validatedResponse.success && validatedResponse.data) {
+        // Validar datos de métricas
+        const validatedMetrics = UserMetricsSchema.parse(validatedResponse.data);
+        console.log('✅ [adminService] Métricas obtenidas y validadas:', validatedMetrics);
+        
+        return {
+          success: true,
+          data: validatedMetrics,
+          message: 'Métricas obtenidas exitosamente'
+        };
+      } else {
+        console.log('❌ [adminService] Error obteniendo métricas:', validatedResponse.message);
+        return validatedResponse;
+      }
     } catch (error) {
       console.error('💥 [adminService] Error obteniendo métricas:', error);
+      
+      // En desarrollo, usar datos mock como fallback
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎭 [adminService] Usando datos mock como fallback');
+        return {
+          success: true,
+          data: {
+            totalUsers: 1250,
+            activeUsers: 1100,
+            inactiveUsers: 150,
+            verifiedUsers: 1000,
+            unverifiedUsers: 250,
+            newUsersToday: 15,
+            newUsersThisWeek: 95,
+            newUsersThisMonth: 420,
+            registrationGrowth: 12.5,
+            lastUpdated: new Date().toISOString()
+          },
+          message: 'Datos mock (desarrollo)'
+        };
+      }
+      
       return {
         success: false,
         message: 'Error de conexión con el servidor'
@@ -103,15 +94,63 @@ export const adminService = {
       
       const response = await apiClient.get<AdminResponse>(`/api/users?page=${page}&limit=${limit}`);
       
-      if (response.success) {
-        console.log('✅ [adminService] Lista de usuarios obtenida');
-      } else {
-        console.log('❌ [adminService] Error obteniendo lista:', response.message);
-      }
+      // Validar respuesta con Zod
+      const validatedResponse = AdminResponseSchema.parse(response);
       
-      return response;
+      if (validatedResponse.success && validatedResponse.data) {
+        // Validar datos de lista de usuarios
+        const validatedUsersList = UsersListSchema.parse(validatedResponse.data);
+        console.log('✅ [adminService] Lista de usuarios obtenida y validada:', validatedUsersList.total);
+        
+        return {
+          success: true,
+          data: validatedUsersList,
+          message: 'Lista de usuarios obtenida exitosamente'
+        };
+      } else {
+        console.log('❌ [adminService] Error obteniendo lista:', validatedResponse.message);
+        return validatedResponse;
+      }
     } catch (error) {
       console.error('💥 [adminService] Error obteniendo lista:', error);
+      
+      // En desarrollo, usar datos mock como fallback
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎭 [adminService] Usando datos mock como fallback');
+        return {
+          success: true,
+          data: {
+            users: [
+              {
+                id: 'user-1',
+                firstName: 'Juan',
+                lastName: 'Pérez',
+                email: 'juan@ejemplo.com',
+                isActive: true,
+                isVerified: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              },
+              {
+                id: 'user-2',
+                firstName: 'María',
+                lastName: 'García',
+                email: 'maria@ejemplo.com',
+                isActive: true,
+                isVerified: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
+            ],
+            total: 2,
+            page: page,
+            limit: limit,
+            totalPages: 1
+          },
+          message: 'Datos mock (desarrollo)'
+        };
+      }
+      
       return {
         success: false,
         message: 'Error de conexión con el servidor'
@@ -181,15 +220,36 @@ export const adminService = {
       
       const response = await apiClient.get<AdminResponse>('/api/users/me');
       
-      if (response.success && response.data?.role === 'admin') {
+      // Validar respuesta con Zod
+      const validatedResponse = AdminResponseSchema.parse(response);
+      
+      if (validatedResponse.success && validatedResponse.data?.role === 'admin') {
         console.log('✅ [adminService] Rol de admin verificado');
-        return { success: true, data: { isAdmin: true } };
+        return { 
+          success: true, 
+          data: { isAdmin: true },
+          message: 'Rol de administrador verificado'
+        };
       } else {
         console.log('❌ [adminService] Usuario no es admin');
-        return { success: false, message: 'Usuario no tiene permisos de administrador' };
+        return { 
+          success: false, 
+          message: 'Usuario no tiene permisos de administrador' 
+        };
       }
     } catch (error) {
       console.error('💥 [adminService] Error verificando rol:', error);
+      
+      // En desarrollo, permitir acceso como admin
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎭 [adminService] Modo desarrollo - permitiendo acceso como admin');
+        return {
+          success: true,
+          data: { isAdmin: true },
+          message: 'Modo desarrollo - acceso permitido'
+        };
+      }
+      
       return {
         success: false,
         message: 'Error de conexión con el servidor'

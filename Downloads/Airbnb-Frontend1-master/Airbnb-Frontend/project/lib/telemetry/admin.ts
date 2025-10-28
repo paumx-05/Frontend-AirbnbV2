@@ -1,206 +1,154 @@
 /**
- * Servicio de telemetría para el panel de administración
+ * Sistema de telemetría básico para el módulo de administración
  * Registra métricas de rendimiento y errores para observabilidad
  */
+
+import { useCallback } from 'react';
 
 interface TelemetryEvent {
   event: string;
   timestamp: string;
-  data: Record<string, any>;
-  userId?: string;
-  sessionId?: string;
-}
-
-interface PerformanceMetrics {
-  endpoint: string;
-  method: string;
-  duration: number;
-  status: number;
-  responseSize?: number;
+  duration?: number;
+  status?: 'success' | 'error' | 'warning';
+  metadata?: Record<string, any>;
 }
 
 class AdminTelemetry {
-  private sessionId: string;
-  private userId?: string;
+  private events: TelemetryEvent[] = [];
+  private isEnabled: boolean;
 
   constructor() {
-    this.sessionId = this.generateSessionId();
-    this.userId = this.getCurrentUserId();
+    // Habilitar telemetría solo en desarrollo o si está explícitamente habilitada
+    this.isEnabled = process.env.NODE_ENV === 'development' || 
+                     process.env.NEXT_PUBLIC_ENABLE_TELEMETRY === 'true';
   }
 
   /**
-   * Generar ID de sesión único
+   * Registrar un evento de telemetría
    */
-  private generateSessionId(): string {
-    return `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+  log(event: string, metadata?: Record<string, any>, status: 'success' | 'error' | 'warning' = 'success') {
+    if (!this.isEnabled) return;
 
-  /**
-   * Obtener ID del usuario actual
-   */
-  private getCurrentUserId(): string | undefined {
-    try {
-      const userData = localStorage.getItem('airbnb_user_data');
-      if (userData) {
-        const user = JSON.parse(userData);
-        return user.id;
-      }
-    } catch (error) {
-      console.warn('No se pudo obtener el ID del usuario:', error);
-    }
-    return undefined;
-  }
-
-  /**
-   * Registrar evento de telemetría
-   */
-  logEvent(event: string, data: Record<string, any> = {}): void {
     const telemetryEvent: TelemetryEvent = {
       event,
       timestamp: new Date().toISOString(),
-      data,
-      userId: this.userId,
-      sessionId: this.sessionId
+      status,
+      metadata
     };
 
-    // Log en consola para desarrollo
-    console.log('📊 [Telemetry]', telemetryEvent);
+    this.events.push(telemetryEvent);
+    
+    // Mantener solo los últimos 100 eventos en memoria
+    if (this.events.length > 100) {
+      this.events = this.events.slice(-100);
+    }
 
-    // En producción, enviar a servicio de telemetría
-    if (process.env.NODE_ENV === 'production') {
-      this.sendToTelemetryService(telemetryEvent);
+    // Log en consola para desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📊 [Telemetry] ${event}:`, metadata);
     }
   }
 
   /**
    * Registrar métricas de rendimiento de API
    */
-  logApiPerformance(metrics: PerformanceMetrics): void {
-    this.logEvent('api_performance', {
-      endpoint: metrics.endpoint,
-      method: metrics.method,
-      duration: metrics.duration,
-      status: metrics.status,
-      responseSize: metrics.responseSize,
-      performance: this.categorizePerformance(metrics.duration)
-    });
-  }
-
-  /**
-   * Registrar error de API
-   */
-  logApiError(endpoint: string, error: Error, status?: number): void {
-    this.logEvent('api_error', {
+  logApiCall(endpoint: string, duration: number, status: 'success' | 'error', responseSize?: number) {
+    this.log('api_call', {
       endpoint,
-      error: error.message,
-      status,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  /**
-   * Registrar carga de componente
-   */
-  logComponentLoad(componentName: string, duration: number): void {
-    this.logEvent('component_load', {
-      component: componentName,
       duration,
-      performance: this.categorizePerformance(duration)
-    });
+      status,
+      responseSize
+    }, status);
   }
 
   /**
-   * Registrar interacción del usuario
+   * Registrar errores de componentes
    */
-  logUserInteraction(action: string, target: string, data?: Record<string, any>): void {
-    this.logEvent('user_interaction', {
+  logError(component: string, error: string, metadata?: Record<string, any>) {
+    this.log('component_error', {
+      component,
+      error,
+      ...metadata
+    }, 'error');
+  }
+
+  /**
+   * Registrar métricas de usuario
+   */
+  logUserAction(action: string, metadata?: Record<string, any>) {
+    this.log('user_action', {
       action,
-      target,
-      ...data
+      ...metadata
     });
   }
 
   /**
-   * Categorizar rendimiento basado en duración
+   * Obtener eventos recientes
    */
-  private categorizePerformance(duration: number): string {
-    if (duration < 200) return 'excellent';
-    if (duration < 500) return 'good';
-    if (duration < 1000) return 'fair';
-    if (duration < 2000) return 'poor';
-    return 'critical';
+  getRecentEvents(limit: number = 10): TelemetryEvent[] {
+    return this.events.slice(-limit);
   }
 
   /**
-   * Enviar evento a servicio de telemetría (producción)
+   * Obtener métricas de rendimiento
    */
-  private async sendToTelemetryService(event: TelemetryEvent): Promise<void> {
-    try {
-      // En producción, enviar a servicio real de telemetría
-      // Por ahora, solo log en consola
-      console.log('📡 [Telemetry] Enviando a servicio:', event);
-    } catch (error) {
-      console.error('Error enviando telemetría:', error);
-    }
-  }
-
-  /**
-   * Obtener métricas de sesión
-   */
-  getSessionMetrics(): Record<string, any> {
+  getPerformanceMetrics() {
+    const apiCalls = this.events.filter(e => e.event === 'api_call');
+    const errors = this.events.filter(e => e.status === 'error');
+    
     return {
-      sessionId: this.sessionId,
-      userId: this.userId,
-      startTime: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      language: navigator.language,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      totalApiCalls: apiCalls.length,
+      averageResponseTime: apiCalls.reduce((sum, call) => sum + (call.duration || 0), 0) / apiCalls.length || 0,
+      errorRate: errors.length / this.events.length || 0,
+      totalErrors: errors.length
     };
   }
+
+  /**
+   * Exportar eventos para análisis
+   */
+  exportEvents(): string {
+    return JSON.stringify(this.events, null, 2);
+  }
+
+  /**
+   * Limpiar eventos
+   */
+  clear() {
+    this.events = [];
+  }
 }
 
-// Instancia global de telemetría
+// Instancia singleton
 export const adminTelemetry = new AdminTelemetry();
 
-// Hook para usar telemetría en componentes React
-export function useAdminTelemetry() {
-  return {
-    logEvent: adminTelemetry.logEvent.bind(adminTelemetry),
-    logApiPerformance: adminTelemetry.logApiPerformance.bind(adminTelemetry),
-    logApiError: adminTelemetry.logApiError.bind(adminTelemetry),
-    logComponentLoad: adminTelemetry.logComponentLoad.bind(adminTelemetry),
-    logUserInteraction: adminTelemetry.logUserInteraction.bind(adminTelemetry),
-    getSessionMetrics: adminTelemetry.getSessionMetrics.bind(adminTelemetry)
-  };
-}
+// Hook para usar telemetría en componentes
+export const useTelemetry = () => {
+  const log = useCallback((event: string, metadata?: Record<string, any>, status: 'success' | 'error' | 'warning' = 'success') => {
+    adminTelemetry.log(event, metadata, status);
+  }, []);
 
-// Interceptor para métricas de API
-export function createApiTelemetryInterceptor() {
+  const logApiCall = useCallback((endpoint: string, duration: number, status: 'success' | 'error', responseSize?: number) => {
+    adminTelemetry.logApiCall(endpoint, duration, status, responseSize);
+  }, []);
+
+  const logError = useCallback((component: string, error: string, metadata?: Record<string, any>) => {
+    adminTelemetry.logError(component, error, metadata);
+  }, []);
+
+  const logUserAction = useCallback((action: string, metadata?: Record<string, any>) => {
+    adminTelemetry.logUserAction(action, metadata);
+  }, []);
+
+  const getMetrics = useCallback(() => {
+    return adminTelemetry.getPerformanceMetrics();
+  }, []);
+
   return {
-    request: (config: any) => {
-      config.metadata = { startTime: Date.now() };
-      return config;
-    },
-    response: (response: any) => {
-      const duration = Date.now() - response.config.metadata.startTime;
-      adminTelemetry.logApiPerformance({
-        endpoint: response.config.url,
-        method: response.config.method?.toUpperCase() || 'GET',
-        duration,
-        status: response.status,
-        responseSize: JSON.stringify(response.data).length
-      });
-      return response;
-    },
-    error: (error: any) => {
-      const duration = Date.now() - error.config?.metadata?.startTime || 0;
-      adminTelemetry.logApiError(
-        error.config?.url || 'unknown',
-        error,
-        error.response?.status
-      );
-      return Promise.reject(error);
-    }
+    log,
+    logApiCall,
+    logError,
+    logUserAction,
+    getMetrics
   };
-}
+};
