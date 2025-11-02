@@ -1,7 +1,8 @@
-import { User, DoorOpen, ShoppingCart } from 'lucide-react';
+import { User, DoorOpen, ShoppingCart, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useReservationCart } from '@/context/ReservationCartContext';
+import { useFavorites } from '@/context/FavoritesContext';
 import { Button } from '@/components/ui/button';
 import UserMenu from '../auth/UserMenu';
 import NotificationBell from '../notifications/NotificationBell';
@@ -19,6 +20,7 @@ interface AuthSectionProps {
 export default function AuthSection({ isMobile = false, onLinkClick }: AuthSectionProps) {
   const { isAuthenticated, logout, user } = useAuth();
   const { getTotalItems } = useReservationCart();
+  const { getTotalFavorites } = useFavorites();
 
   // Log temporal para debugging
   console.log('🔍 [AuthSection] Renderizando con isAuthenticated:', isAuthenticated, 'user:', user?.name);
@@ -108,7 +110,27 @@ export default function AuthSection({ isMobile = false, onLinkClick }: AuthSecti
 
   return (
     <div className="flex items-center space-x-2">
-      {/* Cart Icon with Counter - Reemplaza el icono de usuario */}
+      {/* Favorites Icon with Counter - A la izquierda del carrito */}
+      {isAuthenticated && (
+        <div className="relative">
+          <Link href="/favorites">
+            <Button
+              variant="ghost"
+              className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-700/50 transition-all duration-200"
+              title={`${getTotalFavorites()} favorito${getTotalFavorites() !== 1 ? 's' : ''}`}
+            >
+              <Heart className="h-5 w-5" />
+              {getTotalFavorites() > 0 && (
+                <span className={`absolute -top-1 -right-1 bg-[${COLORS.primary}] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium`}>
+                  {getTotalFavorites()}
+                </span>
+              )}
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* Cart Icon with Counter - Al lado de favoritos */}
       {isAuthenticated && (
         <div className="relative">
           <Link href="/cart">

@@ -1,6 +1,6 @@
 'use client';
 
-import { Menu, Globe, ShoppingCart } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useMobileMenu } from '@/hooks/useMobileMenu';
@@ -40,10 +40,6 @@ export default function Header() {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
-            <button className={COMMON_STYLES.button.icon}>
-              <Globe className="h-5 w-5" />
-            </button>
-
             {/* Authentication Section */}
             <AuthSection />
 

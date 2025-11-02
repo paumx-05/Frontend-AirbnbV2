@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
 import { SearchProvider } from '@/context/SearchContext';
 import { ReservationCartProvider } from '@/context/ReservationCartContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 import { TokenRefreshProvider } from '@/components/auth/TokenRefreshProvider';
 import WelcomeNotification from '@/components/notifications/WelcomeNotification';
 
@@ -35,8 +36,10 @@ export default function RootLayout({
             <NotificationsProvider>
               <SearchProvider>
                 <ReservationCartProvider>
-                  <WelcomeNotification />
-                  {children}
+                  <FavoritesProvider>
+                    <WelcomeNotification />
+                    {children}
+                  </FavoritesProvider>
                 </ReservationCartProvider>
               </SearchProvider>
             </NotificationsProvider>

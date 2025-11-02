@@ -31,10 +31,35 @@ export default function PropertyCard({
   description
 }: PropertyCardProps) {
   const router = useRouter();
+  const { isFavorite, addToFavorites, removeFromFavorites } = useFavorites();
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Verificar si está en favoritos
+  const isInFavorites = isFavorite(id);
 
   // Función para navegar al detalle de la propiedad
   const handleCardClick = () => {
     router.push(`/detail/${id}`);
+  };
+
+  // Función para manejar el toggle de favoritos
+  const handleFavoriteClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation(); // Evitar que se active la navegación
+    
+    if (isToggling) return;
+    
+    setIsToggling(true);
+    try {
+      if (isInFavorites) {
+        await removeFromFavorites(id);
+      } else {
+        await addToFavorites(id);
+      }
+    } catch (error) {
+      console.error('Error al cambiar favorito:', error);
+    } finally {
+      setIsToggling(false);
+    }
   };
 
   return (
@@ -50,14 +75,18 @@ export default function PropertyCard({
         
         {/* Wishlist button */}
         <button 
-          className="absolute top-3 right-3 p-2 rounded-full hover:scale-110 transition-transform duration-200"
-          onClick={(e) => {
-            e.stopPropagation(); // Evitar que se active la navegación
-            // TODO: Implementar funcionalidad de wishlist
-            console.log('Añadir a favoritos:', id);
-          }}
+          className="absolute top-3 right-3 p-2 rounded-full hover:scale-110 transition-transform duration-200 bg-black/20 hover:bg-black/40"
+          onClick={handleFavoriteClick}
+          disabled={isToggling}
+          title={isInFavorites ? 'Quitar de favoritos' : 'Añadir a favoritos'}
         >
-          <Heart className="h-5 w-5 text-white drop-shadow-lg hover:fill-[#FF385C] hover:text-[#FF385C] transition-colors duration-200" />
+          <Heart 
+            className={`h-5 w-5 drop-shadow-lg transition-colors duration-200 ${
+              isInFavorites 
+                ? 'fill-[#FF385C] text-[#FF385C]' 
+                : 'text-white hover:fill-[#FF385C] hover:text-[#FF385C]'
+            }`} 
+          />
         </button>
 
         {/* Image indicators */}
