@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { propertyService, type Property, getLocationString } from '@/lib/api/properties';
+import { useFavorites } from '@/context/FavoritesContext';
 import PropertyGallery from './PropertyGallery';
 import HostInfo from './HostInfo';
 import ReservationSidebar from './ReservationSidebar';
+import { Heart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PropertyDetailProps {
   propertyId: string;
@@ -13,9 +16,32 @@ interface PropertyDetailProps {
 
 const PropertyDetail = ({ propertyId }: PropertyDetailProps) => {
   const router = useRouter();
+  const { isFavorite, addToFavorites, removeFromFavorites } = useFavorites();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Verificar si está en favoritos
+  const isInFavorites = property ? isFavorite(property.id) : false;
+
+  // Función para manejar el toggle de favoritos
+  const handleFavoriteClick = async () => {
+    if (!property || isToggling) return;
+
+    setIsToggling(true);
+    try {
+      if (isInFavorites) {
+        await removeFromFavorites(property.id);
+      } else {
+        await addToFavorites(property.id);
+      }
+    } catch (error) {
+      console.error('Error al cambiar favorito:', error);
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   useEffect(() => {
     const loadProperty = async () => {
@@ -102,15 +128,40 @@ const PropertyDetail = ({ propertyId }: PropertyDetailProps) => {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.title}</h1>
-        <div className="flex items-center gap-4 text-gray-600">
-          <span className="flex items-center gap-1">
-            <span className="text-yellow-500">⭐</span>
-            <span className="font-medium">{property.rating}</span>
-            <span>({property.reviewCount} reseñas)</span>
-          </span>
-          <span>•</span>
-          <span>{getLocationString(property.location)}</span>
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.title}</h1>
+            <div className="flex items-center gap-4 text-gray-600">
+              <span className="flex items-center gap-1">
+                <span className="text-yellow-500">⭐</span>
+                <span className="font-medium">{property.rating}</span>
+                <span>({property.reviewCount} reseñas)</span>
+              </span>
+              <span>•</span>
+              <span>{getLocationString(property.location)}</span>
+            </div>
+          </div>
+          
+          {/* Botón de favoritos */}
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={handleFavoriteClick}
+            disabled={isToggling}
+            className="ml-4 flex items-center gap-2 border-2 hover:border-[#FF385C] transition-colors"
+            title={isInFavorites ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+          >
+            <Heart
+              className={`h-5 w-5 transition-colors ${
+                isInFavorites
+                  ? 'fill-[#FF385C] text-[#FF385C]'
+                  : 'text-gray-600 group-hover:text-[#FF385C]'
+              }`}
+            />
+            <span className="hidden sm:inline">
+              {isInFavorites ? 'En favoritos' : 'Guardar'}
+            </span>
+          </Button>
         </div>
       </div>
 

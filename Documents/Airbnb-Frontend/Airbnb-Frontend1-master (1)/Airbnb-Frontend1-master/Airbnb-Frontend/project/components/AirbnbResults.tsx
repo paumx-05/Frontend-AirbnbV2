@@ -4,14 +4,41 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { type Property, getLocationString } from '@/lib/api/properties';
 import { useSearch } from '@/context/SearchContext';
+import { useFavorites } from '@/context/FavoritesContext';
+import { Heart } from 'lucide-react';
 
 // Componente para mostrar una tarjeta de propiedad individual
 const PropertyCard = ({ property }: { property: Property }) => {
   const router = useRouter();
+  const { isFavorite, addToFavorites, removeFromFavorites } = useFavorites();
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Verificar si está en favoritos
+  const isInFavorites = isFavorite(property.id);
 
   // Función para navegar al detalle de la propiedad
   const handleCardClick = () => {
     router.push(`/detail/${property.id}`);
+  };
+
+  // Función para manejar el toggle de favoritos
+  const handleFavoriteClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation(); // Evitar que se active la navegación
+
+    if (isToggling) return;
+
+    setIsToggling(true);
+    try {
+      if (isInFavorites) {
+        await removeFromFavorites(property.id);
+      } else {
+        await addToFavorites(property.id);
+      }
+    } catch (error) {
+      console.error('Error al cambiar favorito:', error);
+    } finally {
+      setIsToggling(false);
+    }
   };
 
   return (
@@ -32,8 +59,25 @@ const PropertyCard = ({ property }: { property: Property }) => {
           }}
           loading="lazy"
         />
+        
+        {/* Botón de favoritos */}
+        <button
+          className="absolute top-3 right-3 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg hover:scale-110 transition-all duration-200 z-10"
+          onClick={handleFavoriteClick}
+          disabled={isToggling}
+          title={isInFavorites ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+        >
+          <Heart
+            className={`h-5 w-5 transition-colors ${
+              isInFavorites
+                ? 'fill-[#FF385C] text-[#FF385C]'
+                : 'text-gray-700 hover:text-[#FF385C]'
+            }`}
+          />
+        </button>
+
         {property.instantBook && (
-          <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
+          <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
             Reserva instantánea
           </div>
         )}
