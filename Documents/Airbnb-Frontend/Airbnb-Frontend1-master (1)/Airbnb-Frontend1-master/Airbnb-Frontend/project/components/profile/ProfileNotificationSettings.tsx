@@ -53,16 +53,16 @@ export default function ProfileNotificationSettings({ className }: ProfileNotifi
     };
 
   return (
-    <Card className={`bg-slate-800 border-slate-700 ${className ?? ''}`}>
+    <Card className={`bg-white border-2 border-slate-200 shadow-md rounded-sm ${className ?? ''}`}>
       <CardHeader>
-        <CardTitle className="text-white">Notificaciones</CardTitle>
-        <CardDescription className="text-slate-400">Gestiona cómo quieres recibir notificaciones</CardDescription>
+        <CardTitle className="text-slate-900">Notificaciones</CardTitle>
+        <CardDescription className="text-slate-600">Gestiona cómo quieres recibir notificaciones</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <label 
             htmlFor="email-notifications" 
-            className="text-slate-300 text-sm cursor-pointer"
+            className="text-slate-800 text-sm font-medium cursor-pointer"
           >
             Recibir emails
           </label>
@@ -76,7 +76,7 @@ export default function ProfileNotificationSettings({ className }: ProfileNotifi
         <div className="flex items-center justify-between">
           <label 
             htmlFor="push-notifications" 
-            className="text-slate-300 text-sm cursor-pointer"
+            className="text-slate-800 text-sm font-medium cursor-pointer"
           >
             Notificaciones push
           </label>
@@ -90,7 +90,7 @@ export default function ProfileNotificationSettings({ className }: ProfileNotifi
         <div className="flex items-center justify-between">
           <label 
             htmlFor="sound-notifications" 
-            className="text-slate-300 text-sm cursor-pointer"
+            className="text-slate-800 text-sm font-medium cursor-pointer"
           >
             Sonido de notificaciones
           </label>
@@ -104,7 +104,7 @@ export default function ProfileNotificationSettings({ className }: ProfileNotifi
         <div className="flex items-center justify-between">
           <label 
             htmlFor="marketing-notifications" 
-            className="text-slate-300 text-sm cursor-pointer"
+            className="text-slate-800 text-sm font-medium cursor-pointer"
           >
             Marketing y promociones
           </label>
@@ -118,7 +118,7 @@ export default function ProfileNotificationSettings({ className }: ProfileNotifi
         <div className="flex items-center justify-between">
           <label 
             htmlFor="mute-all-notifications" 
-            className="text-slate-300 text-sm cursor-pointer"
+            className="text-slate-800 text-sm font-medium cursor-pointer"
           >
             Silenciar todas
           </label>
@@ -130,7 +130,7 @@ export default function ProfileNotificationSettings({ className }: ProfileNotifi
           />
         </div>
         <Button
-          className="w-full bg-[#FF385C] hover:bg-[#E31C5F] text-white"
+          className="w-full bg-[#FF385C] hover:bg-[#E31C5F] text-white rounded-sm"
           onClick={handleTestNotification}
           aria-label="Probar notificación de prueba"
           tabIndex={0}

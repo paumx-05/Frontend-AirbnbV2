@@ -15,36 +15,84 @@ export default function BackendStatusChecker() {
     try {
       console.log('🔍 [BackendStatusChecker] Verificando backend...');
       
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: 'test@example.com',
-          password: 'test123'
-        })
-      });
+      // Intentar hacer una petición simple al backend
+      // Usamos OPTIONS o un endpoint que no requiera autenticación
+      // Si no existe /api/health, intentamos con login pero manejamos el 401 como "online"
+      // Intentar verificar conectividad sin generar errores en consola
+      // Usamos un método HEAD o OPTIONS si está disponible, o simplemente verificamos conectividad
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
       
-      const data = await response.json();
-      console.log('📥 [BackendStatusChecker] Respuesta:', data);
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'test@example.com',
+            password: 'test123'
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // Si recibimos respuesta (aunque sea 401), el backend está funcionando
+        // 401 significa que el backend está respondiendo pero las credenciales son inválidas
+        // Esto es exactamente lo que esperamos en una verificación de conectividad
+        if (response.status === 401 || response.status === 400) {
+          setStatus('online');
+          setDetails(`✅ Backend funcionando correctamente\n\nStatus: ${response.status}\nRespuesta: El backend está respondiendo`);
+          // No loguear en consola para evitar ruido
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          setStatus('online');
+          setDetails(`✅ Backend funcionando\nStatus: ${response.status}`);
+          return;
+        }
+        
+        setStatus('error');
+        setDetails(`⚠️ Backend responde pero con error inesperado\nStatus: ${response.status}`);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        // Si es un error de abort, significa timeout (backend no responde)
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Timeout: Backend no responde');
+        }
+        throw fetchError;
+      }
       
       if (response.ok) {
         setStatus('online');
-        setDetails(`✅ Backend funcionando\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`);
+        setDetails(`✅ Backend funcionando\nStatus: ${response.status}`);
+        console.log('✅ [BackendStatusChecker] Backend funcionando');
       } else {
         setStatus('error');
-        setDetails(`❌ Backend responde pero con error\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`);
+        setDetails(`⚠️ Backend responde pero con error inesperado\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`);
+        console.log('⚠️ [BackendStatusChecker] Backend con error:', response.status);
       }
     } catch (error) {
-      console.log('💥 [BackendStatusChecker] Error:', error);
+      console.log('💥 [BackendStatusChecker] Error de conexión:', error);
       setStatus('offline');
-      setDetails(`❌ Backend no disponible\nError: ${error}\n\nSolución: Iniciar el backend en puerto 5000`);
+      setDetails(`❌ Backend no disponible\n\nError: ${error instanceof Error ? error.message : 'Error de conexión'}\n\nSolución:\n1. Iniciar el backend en puerto 5000\n2. Verificar que el backend esté funcionando\n3. Revisar la configuración de CORS`);
     }
   };
 
+  // Solo verificar automáticamente en desarrollo
   useEffect(() => {
-    checkBackend();
+    // Solo hacer check automático en desarrollo o si hay una flag explícita
+    if (process.env.NODE_ENV === 'development') {
+      checkBackend();
+    } else {
+      // En producción, no verificar automáticamente para evitar ruido
+      setStatus('checking');
+      setDetails('Click en el botón para verificar el estado del backend');
+    }
   }, []);
 
   const getStatusIcon = () => {

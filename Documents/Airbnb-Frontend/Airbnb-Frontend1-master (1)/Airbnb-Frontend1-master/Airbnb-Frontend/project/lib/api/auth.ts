@@ -11,6 +11,7 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
+  description?: string | null;
   createdAt: string;
   role: 'admin' | 'user'; // Rol del usuario - REQUERIDO - debe venir del backend
 }
@@ -35,6 +36,40 @@ export interface RegisterRequest {
   email: string;
   password: string;
   name: string;
+}
+
+/**
+ * Función helper para convertir URL de avatar a proxy (evita CORS)
+ */
+function convertAvatarToProxy(avatarUrl: string | null | undefined): string | undefined {
+  if (!avatarUrl) {
+    return undefined;
+  }
+  
+  // Si ya es una URL del proxy, devolverla tal cual
+  if (avatarUrl.includes('/api/proxy/avatar')) {
+    return avatarUrl;
+  }
+  
+  // Si es una URL relativa (empieza con /), usar el proxy
+  if (avatarUrl.startsWith('/')) {
+    return `/api/proxy/avatar?path=${encodeURIComponent(avatarUrl)}`;
+  }
+  
+  // Si es URL del backend local, convertir a proxy
+  if (avatarUrl.startsWith('http://localhost:5000/') || avatarUrl.startsWith('http://127.0.0.1:5000/')) {
+    const path = avatarUrl.replace(/^https?:\/\/[^/]+/, '');
+    return `/api/proxy/avatar?path=${encodeURIComponent(path)}`;
+  }
+  
+  // Si no tiene protocolo, usar proxy
+  if (!avatarUrl.startsWith('http://') && !avatarUrl.startsWith('https://')) {
+    const path = avatarUrl.startsWith('/') ? avatarUrl : `/${avatarUrl}`;
+    return `/api/proxy/avatar?path=${encodeURIComponent(path)}`;
+  }
+  
+  // Si es una URL externa completa (https://...), usar directamente
+  return avatarUrl;
 }
 
 /**
@@ -98,7 +133,7 @@ export const authService = {
       if (response.success && token && user) {
         console.log('✅ [authService] Login exitoso, guardando token y usuario');
         console.log('🔍 [authService] Token recibido:', token.substring(0, 20) + '...');
-        console.log('🔍 [authService] Usuario recibido:', user.name);
+        console.log('🔍 [authService] Usuario recibido del backend:', JSON.stringify(user, null, 2));
         console.log('🔍 [authService] Rol del usuario:', user.role || 'NO ESPECIFICADO');
         
         // Verificar que el backend devolvió el campo role
@@ -112,13 +147,39 @@ export const authService = {
           console.warn('⚠️ [authService] Asignando role="user" por defecto (TEMPORAL)');
         }
         
+        // ⚠️ Verificar campo name
+        if (!user.name || !user.name.trim()) {
+          console.warn('⚠️ [authService] El backend NO devolvió el campo "name" válido en login');
+          console.warn('⚠️ [authService] Name recibido:', user.name);
+          console.warn('⚠️ [authService] Se mantendrá el valor actual o se usará "Usuario" por defecto');
+        }
+        
+        // ⚠️ Verificar campos description y avatar
+        if (user.description === undefined) {
+          console.warn('⚠️ [authService] El backend NO devolvió el campo "description" en login');
+          console.warn('⚠️ [authService] Se guardará como null (el backend debería devolverlo)');
+          user.description = null;
+        }
+        if (user.avatar === undefined) {
+          console.warn('⚠️ [authService] El backend NO devolvió el campo "avatar" en login');
+          console.warn('⚠️ [authService] Se guardará como undefined (el backend debería devolverlo)');
+        }
+        
+        console.log('🔍 [authService] Campos verificados en login:');
+        console.log('  - name:', user.name || 'NO DEFINIDO');
+        console.log('  - description:', user.description ?? 'NO DEFINIDO');
+        console.log('  - avatar:', user.avatar ?? 'NO DEFINIDO');
+        
         // Usar tokenStorage para guardar token (localStorage + cookies + apiClient)
         tokenStorage.set(token);
         console.log('🔍 [authService] Token guardado con tokenStorage');
         
-        // Guardar información del usuario (incluyendo el role)
+        // Guardar información del usuario (incluyendo el role, description, avatar)
         localStorage.setItem('user', JSON.stringify(user));
-        console.log('🔍 [authService] Usuario guardado en localStorage con role:', user.role);
+        console.log('🔍 [authService] Usuario guardado en localStorage:');
+        console.log('  - role:', user.role);
+        console.log('  - description:', user.description ?? 'NO DEFINIDO');
+        console.log('  - avatar:', user.avatar ?? 'NO DEFINIDO');
         
         // Verificar que se guardó correctamente
         const savedToken = localStorage.getItem('airbnb_auth_token');
@@ -304,11 +365,76 @@ export const authService = {
     try {
       const response = await apiClient.get<AuthResponse>('/api/auth/me');
       
+      console.log('🔍 [authService.getProfile] Respuesta completa del backend:', JSON.stringify(response, null, 2));
+      
       // Verificar que el usuario tenga el campo role
       const user = response.data?.user || response.user;
-      if (user && !user.role) {
-        console.warn('⚠️ [authService] El backend no devolvió el campo "role" en /api/auth/me');
-        console.warn('⚠️ [authService] Respuesta recibida:', JSON.stringify(response, null, 2));
+      if (user) {
+        if (!user.role) {
+          console.warn('⚠️ [authService] El backend no devolvió el campo "role" en /api/auth/me');
+          console.warn('⚠️ [authService] Respuesta recibida:', JSON.stringify(response, null, 2));
+        }
+        
+        // ⚠️ Verificar campo name
+        if (!user.name || !user.name.trim()) {
+          console.warn('⚠️ [authService.getProfile] El backend NO devolvió el campo "name" válido');
+          console.warn('⚠️ [authService.getProfile] Name recibido:', user.name);
+          console.warn('⚠️ [authService.getProfile] El usuario en localStorage mantendrá su name anterior');
+        } else {
+          console.log('✅ [authService.getProfile] Campo "name" recibido:', user.name);
+        }
+        
+        // ⚠️ Verificar campos description y avatar
+        if (user.description === undefined) {
+          console.warn('⚠️ [authService.getProfile] El backend NO devolvió el campo "description"');
+          console.warn('⚠️ [authService.getProfile] El usuario en localStorage mantendrá su description anterior');
+        } else {
+          console.log('✅ [authService.getProfile] Campo "description" recibido:', user.description);
+        }
+        
+        if (user.avatar === undefined) {
+          console.warn('⚠️ [authService.getProfile] El backend NO devolvió el campo "avatar"');
+          console.warn('⚠️ [authService.getProfile] El usuario en localStorage mantendrá su avatar anterior');
+        } else {
+          console.log('✅ [authService.getProfile] Campo "avatar" recibido:', user.avatar);
+        }
+        
+        // ⚠️ MERGE: Preservar campos que el backend no devuelve
+        const cachedUserStr = localStorage.getItem('user');
+        const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+        
+        if (cachedUser) {
+          const mergedUser = {
+            ...user,
+            // Para name: usar backend si existe y no está vacío, sino mantener local
+            name: user.name && user.name.trim() 
+              ? user.name.trim() 
+              : (cachedUser.name || user.name || 'Usuario'),
+            description: user.description !== undefined ? user.description : (cachedUser.description ?? null),
+            avatar: user.avatar !== undefined 
+              ? convertAvatarToProxy(user.avatar)
+              : (cachedUser.avatar ?? undefined),
+          };
+          
+          // Actualizar response con el usuario merged
+          if (response.user) {
+            response.user = mergedUser;
+          }
+          if (response.data?.user) {
+            response.data.user = mergedUser;
+          }
+          
+          console.log('🔍 [authService.getProfile] Usuario después del merge:');
+          console.log('  - name (backend):', user.name);
+          console.log('  - name (cached):', cachedUser.name);
+          console.log('  - name (final):', mergedUser.name);
+          console.log('  - description (backend):', user.description);
+          console.log('  - description (cached):', cachedUser.description);
+          console.log('  - description (final):', mergedUser.description);
+          console.log('  - avatar (backend):', user.avatar);
+          console.log('  - avatar (cached):', cachedUser.avatar);
+          console.log('  - avatar (final):', mergedUser.avatar);
+        }
       }
       
       return response;
@@ -376,35 +502,68 @@ export const authService = {
     
     try {
       console.log('🔍 [authService] Verificando token con el backend...');
+      
+      // Obtener usuario actual de localStorage como backup
+      const cachedUserStr = localStorage.getItem('user');
+      const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+      
       const response = await apiClient.get<AuthResponse>('/api/auth/me');
       
-      console.log('🔍 [authService] Respuesta del backend:', response);
+      console.log('🔍 [authService] Respuesta del backend:', JSON.stringify(response, null, 2));
       
       // El backend puede devolver el usuario en response.user o response.data.user
-      const user = response.user || response.data?.user;
+      const backendUser = response.user || response.data?.user;
       
-      if (response.success && user) {
-        console.log('✅ [authService] Token válido, usuario autenticado:', user.name);
+      if (response.success && backendUser) {
+        console.log('✅ [authService] Token válido, usuario autenticado:', backendUser.name);
         
         // Verificar que el usuario tenga el campo role
-        if (!user.role) {
+        if (!backendUser.role) {
           console.warn('⚠️ [authService] El backend no devolvió el campo "role" en /api/auth/me');
-          console.warn('⚠️ [authService] Usuario recibido:', JSON.stringify(user, null, 2));
+          console.warn('⚠️ [authService] Usuario recibido:', JSON.stringify(backendUser, null, 2));
           console.warn('⚠️ [authService] Esto puede causar problemas con las funciones de admin');
           // Por defecto, asumir 'user' si no viene el role
-          user.role = 'user';
+          backendUser.role = 'user';
         }
         
-        // Guardar el usuario con el role actualizado en localStorage
-        localStorage.setItem('user', JSON.stringify(user));
+        // ⚠️ MERGE INTELIGENTE: Preservar campos que el backend podría no devolver
+        // Si el backend no devuelve 'description', 'avatar' o 'name' es vacío, mantener los valores locales
+        const mergedUser: User = {
+          ...backendUser,
+          // Para name: usar backend si existe y no está vacío, sino mantener local
+          name: backendUser.name && backendUser.name.trim() 
+            ? backendUser.name.trim() 
+            : (cachedUser?.name || backendUser.name || 'Usuario'),
+          // Solo usar valores del backend si existen, sino mantener los locales
+          description: backendUser.description !== undefined 
+            ? backendUser.description 
+            : (cachedUser?.description ?? null),
+          avatar: backendUser.avatar !== undefined 
+            ? convertAvatarToProxy(backendUser.avatar)
+            : (cachedUser?.avatar ?? undefined),
+        };
         
-        return user;
+        console.log('🔍 [authService] Usuario después del merge:');
+        console.log('  - name (backend):', backendUser.name);
+        console.log('  - name (cached):', cachedUser?.name);
+        console.log('  - name (final):', mergedUser.name);
+        console.log('  - description (backend):', backendUser.description);
+        console.log('  - description (cached):', cachedUser?.description);
+        console.log('  - description (final):', mergedUser.description);
+        console.log('  - avatar (backend):', backendUser.avatar);
+        console.log('  - avatar (cached):', cachedUser?.avatar);
+        console.log('  - avatar (final):', mergedUser.avatar);
+        
+        // Guardar el usuario merged en localStorage
+        localStorage.setItem('user', JSON.stringify(mergedUser));
+        
+        return mergedUser;
       } else {
         console.log('❌ [authService] Token inválido, limpiando storage');
         console.log('  - response.success:', response.success);
         console.log('  - response.user:', response.user);
         console.log('  - response.data:', response.data);
-        console.log('  - user extraído:', user);
+        console.log('  - user extraído:', backendUser);
         console.log('  - response.message:', response.message);
         localStorage.removeItem('airbnb_auth_token');
         localStorage.removeItem('user');
