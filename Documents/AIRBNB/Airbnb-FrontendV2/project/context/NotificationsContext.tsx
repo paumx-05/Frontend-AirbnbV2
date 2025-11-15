@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { notificationsService } from '@/lib/api/notifications';
 import { Notification } from '@/schemas/notifications';
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'promo';
+export type NotificationType = 'info' | 'success' | 'warning' | 'promo' | 'error';
 
 // Alias para compatibilidad con componentes existentes
 export interface AppNotification {

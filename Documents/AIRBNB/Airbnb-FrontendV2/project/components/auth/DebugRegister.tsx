@@ -25,7 +25,7 @@ export default function DebugRegister() {
       setResult(response);
     } catch (error) {
       console.log('🧪 [DebugRegister] Error capturado:', error);
-      setResult({ error: error.message });
+      setResult({ error: error instanceof Error ? error.message : 'Error desconocido' });
     } finally {
       setIsLoading(false);
     }

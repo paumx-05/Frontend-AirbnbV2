@@ -134,7 +134,7 @@ export default function AdminUsersPage() {
       lastName: userToEdit.lastName,
       email: userToEdit.email,
       phone: userToEdit.phone || '',
-      // No incluir password al editar
+      password: '',
     });
     setIsDialogOpen(true);
   };

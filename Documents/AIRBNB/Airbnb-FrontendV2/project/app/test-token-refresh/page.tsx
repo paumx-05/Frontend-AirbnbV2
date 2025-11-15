@@ -3,10 +3,17 @@
  * Esta página permite probar todas las funcionalidades implementadas
  */
 
+'use client';
+
 import TokenRefreshExample from '@/components/auth/TokenRefreshExample';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthDebugger from '@/components/auth/AuthDebugger';
 import ApiClientTester from '@/components/auth/ApiClientTester';
+
+// Configuración para evitar pre-renderizado (usa localStorage)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 export default function TestTokenRefreshPage() {
   return (

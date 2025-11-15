@@ -505,7 +505,7 @@ const MonitoringMetrics = () => {
                   Uso de disco crítico
                 </p>
                 <p className="text-xs text-red-600">
-                  El uso de disco ({formatPercentage(metrics.diskUsage)}) está en un nivel crítico (>90%)
+                  El uso de disco ({formatPercentage(metrics.diskUsage)}) está en un nivel crítico (&gt;90%)
                 </p>
               </div>
             </div>

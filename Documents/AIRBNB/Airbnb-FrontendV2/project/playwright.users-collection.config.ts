@@ -102,13 +102,7 @@ export default defineConfig({
   /* Configuración de output */
   outputDir: 'test-results-users-collection/',
   
-  /* Configuración de variables de entorno para pruebas */
-  env: {
-    TEST_ADMIN_EMAIL: 'admin@airbnb.com',
-    TEST_ADMIN_PASSWORD: 'Admin1234!',
-    TEST_USER_EMAIL: 'ana1@gmail.com',
-    TEST_USER_PASSWORD: '123456789',
-    TEST_NEW_USER_EMAIL: 'testuser@example.com',
-    TEST_NEW_USER_PASSWORD: 'TestPass123',
-  },
+  /* Nota: Las variables de entorno para pruebas deben configurarse en webServer.env
+   * o usarse directamente con process.env en los tests
+   */
 });

@@ -98,9 +98,9 @@ export class ApiClient {
         
         // Si el error es 401 o 403 (token expirado), intentar renovar
         // ⚠️ PROTECCIÓN: No renovar si recibimos 429 (Too Many Requests) o si ya intentamos renovar
+        // Solo renovar si es 401 o 403 (no 429) y el error indica token inválido/expirado
         if ((response.status === 401 || response.status === 403) && 
-            response.status !== 429 && // NO renovar si recibimos 429
-            (errorData.error?.message === 'Token inválido o expirado' || 
+            (errorData.error?.message === 'Token inválido o expirado' ||
              errorData.message === 'Token inválido o expirado' ||
              errorData.message === 'Unauthorized')) {
           
@@ -274,6 +274,21 @@ export class ApiClient {
   ): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+      headers,
+    });
+  }
+
+  /**
+   * PATCH request
+   */
+  async patch<T = any>(
+    endpoint: string, 
+    data?: any, 
+    headers?: Record<string, string>
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
       headers,
     });

@@ -22,8 +22,13 @@ export const TokenRefreshExample: React.FC = () => {
     timeUntilExpiry: null
   });
 
-  // Función para obtener información del token
+  // Función para obtener información del token (solo en cliente)
   const getTokenInfo = () => {
+    if (typeof window === 'undefined') {
+      setTokenInfo({ token: null, expiresAt: null, timeUntilExpiry: null });
+      return;
+    }
+
     const token = localStorage.getItem('airbnb_auth_token');
     if (!token) {
       setTokenInfo({ token: null, expiresAt: null, timeUntilExpiry: null });
@@ -47,11 +52,13 @@ export const TokenRefreshExample: React.FC = () => {
     }
   };
 
-  // Actualizar información del token cada minuto
+  // Actualizar información del token cada minuto (solo en cliente)
   useEffect(() => {
-    getTokenInfo();
-    const interval = setInterval(getTokenInfo, 60000); // cada minuto
-    return () => clearInterval(interval);
+    if (typeof window !== 'undefined') {
+      getTokenInfo();
+      const interval = setInterval(getTokenInfo, 60000); // cada minuto
+      return () => clearInterval(interval);
+    }
   }, []);
 
   // Renovación manual del token

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adminService } from '@/lib/api/admin';
-import { validateActivityMetrics, type ActivityMetrics } from '@/schemas/admin';
+import { validateActivityMetrics } from '@/schemas/admin';
+import type { ActivityMetrics } from '@/schemas/admin';
 import MetricCard from './MetricCard';
 
 const ActivityMetrics = () => {

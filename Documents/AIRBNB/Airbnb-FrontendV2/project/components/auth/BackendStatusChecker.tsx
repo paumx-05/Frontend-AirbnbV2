@@ -66,16 +66,6 @@ export default function BackendStatusChecker() {
         }
         throw fetchError;
       }
-      
-      if (response.ok) {
-        setStatus('online');
-        setDetails(`✅ Backend funcionando\nStatus: ${response.status}`);
-        console.log('✅ [BackendStatusChecker] Backend funcionando');
-      } else {
-        setStatus('error');
-        setDetails(`⚠️ Backend responde pero con error inesperado\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`);
-        console.log('⚠️ [BackendStatusChecker] Backend con error:', response.status);
-      }
     } catch (error) {
       console.log('💥 [BackendStatusChecker] Error de conexión:', error);
       setStatus('offline');

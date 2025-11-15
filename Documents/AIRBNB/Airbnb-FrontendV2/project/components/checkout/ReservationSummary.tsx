@@ -98,7 +98,7 @@ export default function ReservationSummary({ property, reservationData }: Reserv
         <div className="space-y-3 text-sm">
           <div className="flex justify-between py-1">
             <span className="text-gray-600">
-              {formatCurrency(calculatedValues.pricePerNight)} × {calculatedValues.nights} noche{calculatedValues.nights > 1 ? 's' : ''}
+              {formatCurrency(property.pricePerNight || 0)} × {calculatedValues.totalNights} noche{calculatedValues.totalNights > 1 ? 's' : ''}
             </span>
             <span className="text-gray-900 font-medium">{formatCurrency(calculatedValues.subtotal)}</span>
           </div>

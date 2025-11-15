@@ -14,7 +14,13 @@ export const ApiClientTester: React.FC = () => {
     try {
       console.log('🧪 [ApiClientTester] Probando apiClient...');
       
-      // Verificar si hay token
+      // Verificar si hay token (solo en cliente)
+      if (typeof window === 'undefined') {
+        setTestResult('❌ No disponible en servidor');
+        setIsLoading(false);
+        return;
+      }
+      
       const token = localStorage.getItem('airbnb_auth_token');
       console.log('🧪 [ApiClientTester] Token en localStorage:', token ? 'SÍ' : 'NO');
       

@@ -18,14 +18,15 @@ const UserChart = () => {
     const loadChartData = async () => {
       try {
         setIsLoading(true);
-        const response = await adminService.getRegistrationStats(period);
-        
-        if (response.success && response.data) {
-          setData(response.data);
-        } else {
-          // Datos de ejemplo si no hay respuesta del servidor
-          setData(generateMockData(period));
-        }
+        // TODO: Implementar endpoint getRegistrationStats en el backend
+        // Por ahora usamos datos mock
+        // const response = await adminService.getRegistrationStats(period);
+        // if (response.success && response.data) {
+        //   setData(response.data);
+        // } else {
+        //   setData(generateMockData(period));
+        // }
+        setData(generateMockData(period));
       } catch (error) {
         console.error('Error cargando datos del gráfico:', error);
         setData(generateMockData(period));

@@ -2,9 +2,9 @@
 
 interface MetricCardProps {
   title: string;
-  value: number;
+  value: number | string; // Permite números o strings formateados (ej: "2h 30m")
   icon: string;
-  color: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'yellow';
   trend?: number;
   subtitle?: string;
 }
@@ -41,13 +41,22 @@ const MetricCard = ({ title, value, icon, color, trend, subtitle }: MetricCardPr
       border: 'border-red-200',
       text: 'text-red-600',
       iconBg: 'bg-red-100'
+    },
+    yellow: {
+      bg: 'bg-yellow-50',
+      border: 'border-yellow-200',
+      text: 'text-yellow-600',
+      iconBg: 'bg-yellow-100'
     }
   };
 
   const currentColor = colorClasses[color];
 
-  // Formatear el valor con separadores de miles
-  const formatValue = (val: number): string => {
+  // Formatear el valor con separadores de miles (solo para números)
+  const formatValue = (val: number | string): string => {
+    if (typeof val === 'string') {
+      return val; // Si ya es string, devolverlo tal cual
+    }
     return val.toLocaleString('es-ES');
   };
 

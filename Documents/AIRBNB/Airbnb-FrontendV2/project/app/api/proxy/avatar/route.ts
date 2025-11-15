@@ -5,7 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
  * Esto evita problemas de CORS al cargar imágenes desde otro origen
  * 
  * Uso: /api/proxy/avatar?path=/uploads/avatars/avatar.jpg
+ * 
+ * Marcar como dinámico para permitir uso de searchParams en export estático
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

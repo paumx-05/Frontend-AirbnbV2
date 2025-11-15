@@ -100,8 +100,17 @@ export default function AuthDebugger() {
     }
   };
 
-  // Verificar estado del frontend
+  // Verificar estado del frontend (solo en cliente)
   const checkFrontendAuth = () => {
+    if (typeof window === 'undefined') {
+      return {
+        hasToken: false,
+        hasUser: false,
+        token: null,
+        user: null
+      };
+    }
+    
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
     
@@ -119,7 +128,22 @@ export default function AuthDebugger() {
     return () => clearInterval(interval);
   }, []);
 
-  const frontendAuth = checkFrontendAuth();
+  const [frontendAuth, setFrontendAuth] = useState<{
+    hasToken: boolean;
+    hasUser: boolean;
+    token: string | null;
+    user: any | null;
+  }>({
+    hasToken: false,
+    hasUser: false,
+    token: null,
+    user: null
+  });
+
+  useEffect(() => {
+    // Solo acceder a localStorage en el cliente
+    setFrontendAuth(checkFrontendAuth());
+  }, []);
 
   return (
     <div className="space-y-6 p-6 bg-slate-900 min-h-screen">

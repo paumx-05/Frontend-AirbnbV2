@@ -25,6 +25,12 @@ export const RegistrationStatsSchema = z.object({
   count: z.number().min(0)
 });
 
+// Esquema para actividad por hora
+export const HourlyActivitySchema = z.object({
+  hour: z.number().min(0).max(23),
+  logins: z.number().min(0)
+});
+
 // Esquema para métricas de actividad
 export const ActivityMetricsSchema = z.object({
   totalLogins: z.number().min(0),
@@ -32,7 +38,8 @@ export const ActivityMetricsSchema = z.object({
   loginsThisWeek: z.number().min(0),
   loginsThisMonth: z.number().min(0),
   averageSessionDuration: z.number().min(0),
-  mostActiveHour: z.number().min(0).max(23)
+  mostActiveHour: z.number().min(0).max(23),
+  hourlyActivity: z.array(HourlyActivitySchema)
 });
 
 // Esquema para estadísticas detalladas de usuarios
@@ -118,4 +125,9 @@ export function validateAdminResponse(data: unknown): AdminResponse {
 // Función para validar lista paginada de usuarios
 export function validatePaginatedUsers(data: unknown): PaginatedUsers {
   return PaginatedUsersSchema.parse(data);
+}
+
+// Función para validar métricas de actividad
+export function validateActivityMetrics(data: unknown): ActivityMetrics {
+  return ActivityMetricsSchema.parse(data);
 }
