@@ -5,14 +5,22 @@
 import { API_CONFIG } from '@/config/api'
 import type { 
   CreateAmigoRequest,
+  EnviarSolicitudRequest,
   UpdateAmigoRequest,
   BackendAmigosResponse,
   BackendAmigoResponse,
   BackendUpdateEstadoResponse,
   BackendDeleteAmigoResponse,
+  BackendUsuariosConEstadoResponse,
+  BackendEnviarSolicitudResponse,
+  BackendSolicitudesResponse,
+  BackendAceptarSolicitudResponse,
+  BackendRechazarSolicitudResponse,
   BackendError,
   AmigoError,
-  Amigo
+  Amigo,
+  UsuarioConEstado,
+  SolicitudAmistad
 } from '@/models/amigos'
 import { 
   AmigosResponseSchema,
@@ -20,8 +28,14 @@ import {
   UpdateEstadoResponseSchema,
   DeleteAmigoResponseSchema,
   CreateAmigoRequestSchema,
+  EnviarSolicitudRequestSchema,
   UpdateAmigoRequestSchema,
-  UpdateEstadoRequestSchema
+  UpdateEstadoRequestSchema,
+  UsuariosConEstadoResponseSchema,
+  EnviarSolicitudResponseSchema,
+  SolicitudesResponseSchema,
+  AceptarSolicitudResponseSchema,
+  RechazarSolicitudResponseSchema
 } from '@/schemas/amigos.schema'
 import { BackendErrorSchema } from '@/schemas/auth.schema'
 import { getToken, clearTokens } from '@/utils/jwt'
@@ -187,7 +201,7 @@ export const amigosService = {
   /**
    * Obtiene amigos filtrados por estado
    */
-  async getAmigosByEstado(estado: 'activo' | 'pendiente' | 'bloqueado'): Promise<Amigo[]> {
+  async getAmigosByEstado(estado: 'activo' | 'pendiente' | 'rechazada' | 'bloqueado'): Promise<Amigo[]> {
     const response = await fetchAPI<BackendAmigosResponse>(
       API_CONFIG.ENDPOINTS.AMIGOS.GET_BY_ESTADO(estado),
       {
@@ -197,6 +211,87 @@ export const amigosService = {
     )
     
     return response.data
+  },
+
+  /**
+   * Busca usuarios del sistema (no solo amigos)
+   */
+  async searchUsuarios(query: string): Promise<UsuarioConEstado[]> {
+    const response = await fetchAPI<BackendUsuariosConEstadoResponse>(
+      API_CONFIG.ENDPOINTS.AMIGOS.SEARCH_USUARIOS(query),
+      {
+        method: 'GET',
+      },
+      UsuariosConEstadoResponseSchema
+    )
+    
+    return response.data
+  },
+
+  /**
+   * Envía una solicitud de amistad a otro usuario
+   */
+  async enviarSolicitud(amigoUserId: string): Promise<Amigo> {
+    // Validar request
+    const validated = EnviarSolicitudRequestSchema.safeParse({ amigoUserId })
+    if (!validated.success) {
+      throw {
+        message: validated.error.issues[0].message,
+        status: 400,
+      } as AmigoError
+    }
+    
+    const response = await fetchAPI<BackendEnviarSolicitudResponse>(
+      API_CONFIG.ENDPOINTS.AMIGOS.ENVIAR_SOLICITUD,
+      {
+        method: 'POST',
+        body: JSON.stringify(validated.data),
+      },
+      EnviarSolicitudResponseSchema
+    )
+    
+    return response.data
+  },
+
+  /**
+   * Obtiene las solicitudes de amistad recibidas
+   */
+  async getSolicitudesRecibidas(): Promise<SolicitudAmistad[]> {
+    const response = await fetchAPI<BackendSolicitudesResponse>(
+      API_CONFIG.ENDPOINTS.AMIGOS.GET_SOLICITUDES,
+      {
+        method: 'GET',
+      },
+      SolicitudesResponseSchema
+    )
+    
+    return response.data
+  },
+
+  /**
+   * Acepta una solicitud de amistad
+   */
+  async aceptarSolicitud(solicitudId: string): Promise<void> {
+    await fetchAPI<BackendAceptarSolicitudResponse>(
+      API_CONFIG.ENDPOINTS.AMIGOS.ACEPTAR_SOLICITUD(solicitudId),
+      {
+        method: 'PUT',
+      },
+      AceptarSolicitudResponseSchema
+    )
+  },
+
+  /**
+   * Rechaza una solicitud de amistad
+   */
+  async rechazarSolicitud(solicitudId: string): Promise<void> {
+    await fetchAPI<BackendRechazarSolicitudResponse>(
+      API_CONFIG.ENDPOINTS.AMIGOS.RECHAZAR_SOLICITUD(solicitudId),
+      {
+        method: 'PUT',
+      },
+      RechazarSolicitudResponseSchema
+    )
   },
 
   /**
@@ -252,7 +347,7 @@ export const amigosService = {
   /**
    * Actualiza el estado de un amigo
    */
-  async updateEstadoAmigo(id: string, estado: 'activo' | 'pendiente' | 'bloqueado'): Promise<Amigo> {
+  async updateEstadoAmigo(id: string, estado: 'activo' | 'pendiente' | 'rechazada' | 'bloqueado'): Promise<Amigo> {
     // Validar request
     const validated = UpdateEstadoRequestSchema.safeParse({ estado })
     if (!validated.success) {

@@ -2,145 +2,73 @@
 
 // Página de Chat con un Amigo
 // Permite enviar y recibir mensajes con un amigo específico
+// Integración completa con backend MongoDB
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { getAuth, getUsuarioActual } from '@/lib/auth'
-
-interface Mensaje {
-  id: string
-  remitente: string
-  asunto: string
-  contenido: string
-  fecha: string
-  leido: boolean
-  amigoId?: string
-  usuarioId?: string
-  esSistema?: boolean
-}
+import { getToken, decodeToken } from '@/utils/jwt'
+import { chatService } from '@/services/chat.service'
+import type { MensajeChat } from '@/models/chat'
+import type { ChatError } from '@/models/chat'
 
 interface Amigo {
-  id: string
+  id: string // ID del registro de amistad
+  userId: string // ID del usuario actual
+  amigoUserId: string // ID del usuario amigo
   nombre: string
   email: string
   avatar?: string
-  fechaAmistad: string
-  estado: 'activo' | 'pendiente' | 'bloqueado'
+  fechaAmistad?: string // Solo para amigos activos
+  estado: 'activo' | 'pendiente' | 'rechazada' | 'bloqueado'
+  solicitadoPor?: string
 }
 
-const AMIGOS_KEY = 'gestor-finanzas-amigos'
-
-// Función helper para crear mensajes mock de ejemplo (útil para pruebas)
-// Esta función puede ser llamada desde la consola del navegador
-// Ejemplo: window.crearMensajeMock('mock-1', 'user-main', 'Juan Pérez', 25.50, 'Cena en McDonald\'s')
-export function crearMensajeMock(
-  usuarioIdReceptor: string, 
-  usuarioIdEmisor: string, 
-  nombreEmisor: string, 
-  monto: number, 
-  descripcion: string
-) {
-  if (typeof window !== 'undefined') {
-    const MENSAJES_KEY_RECEPTOR = `gestor-finanzas-mensajes-${usuarioIdReceptor}`
-    const mensajes = localStorage.getItem(MENSAJES_KEY_RECEPTOR)
-    let mensajesList: Mensaje[] = []
+// Función para obtener amigo desde el backend
+// El amigoId en la URL es el _id del registro de amistad
+async function getAmigo(amigoId: string): Promise<Amigo | null> {
+  try {
+    const { getAmigos } = await import('@/lib/amigos')
+    const amigos = await getAmigos()
     
-    if (mensajes) {
-      try {
-        mensajesList = JSON.parse(mensajes)
-      } catch (e) {
-        mensajesList = []
+    console.log('🔍 Buscando amigo:', {
+      amigoIdBuscado: amigoId,
+      totalAmigos: amigos.length,
+      amigos: amigos.map(a => ({ id: a.id, userId: a.userId, nombre: a.nombre, email: a.email })),
+    })
+    
+    // Buscar por id del registro de amistad (el backend espera este ID)
+    const amigo = amigos.find(a => a.id === amigoId)
+    
+    if (amigo) {
+      console.log('✅ Amigo encontrado:', {
+        id: amigo.id,
+        userId: amigo.userId,
+        amigoUserId: amigo.amigoUserId,
+        nombre: amigo.nombre,
+        email: amigo.email,
+        estado: amigo.estado,
+      })
+      return {
+        id: amigo.id,
+        userId: amigo.userId,
+        amigoUserId: amigo.amigoUserId,
+        nombre: amigo.nombre,
+        email: amigo.email,
+        avatar: amigo.avatar,
+        fechaAmistad: amigo.fechaAmistad,
+        estado: amigo.estado,
+        solicitadoPor: amigo.solicitadoPor,
       }
     }
     
-    const nuevoMensaje: Mensaje = {
-      id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
-      remitente: nombreEmisor,
-      asunto: `Recordatorio de pago: ${descripcion}`,
-      contenido: `Hola,\n\nTe recordamos que debes pagar ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(monto)} por el gasto "${descripcion}".\n\nPor favor, realiza el pago cuando puedas.\n\nGracias.`,
-      fecha: new Date().toISOString(),
-      leido: false,
-      amigoId: usuarioIdEmisor, // ID del usuario que envía (desde la perspectiva del receptor)
-      usuarioId: usuarioIdEmisor, // ID del usuario que envía
-      esSistema: true
-    }
-    
-    mensajesList.push(nuevoMensaje)
-    localStorage.setItem(MENSAJES_KEY_RECEPTOR, JSON.stringify(mensajesList))
-    
-    console.log(`✅ Mensaje mock creado para el usuario ${usuarioIdReceptor}`)
-    return nuevoMensaje
+    console.warn('⚠️ Amigo no encontrado con id:', amigoId)
+    return null
+  } catch (error) {
+    console.error('Error al obtener amigo:', error)
+    return null
   }
-  return null
-}
-
-// Hacer la función disponible globalmente para uso desde la consola
-if (typeof window !== 'undefined') {
-  (window as any).crearMensajeMock = crearMensajeMock
-}
-
-// Función para obtener mensajes del usuario actual
-function getMensajesUsuario(usuarioId: string): Mensaje[] {
-  if (typeof window !== 'undefined') {
-    const MENSAJES_KEY = `gestor-finanzas-mensajes-${usuarioId}`
-    const mensajes = localStorage.getItem(MENSAJES_KEY)
-    if (mensajes) {
-      return JSON.parse(mensajes)
-    }
-  }
-  return []
-}
-
-// Función para guardar mensajes del usuario actual
-function saveMensajesUsuario(usuarioId: string, mensajes: Mensaje[]) {
-  if (typeof window !== 'undefined') {
-    const MENSAJES_KEY = `gestor-finanzas-mensajes-${usuarioId}`
-    localStorage.setItem(MENSAJES_KEY, JSON.stringify(mensajes))
-  }
-}
-
-// Función para guardar mensaje en el chat del amigo también (para que el amigo lo vea cuando inicie sesión)
-function saveMensajeAmigo(amigoId: string, mensaje: Mensaje, nombreRemitente: string) {
-  if (typeof window !== 'undefined') {
-    const MENSAJES_KEY_AMIGO = `gestor-finanzas-mensajes-${amigoId}`
-    const mensajesAmigo = localStorage.getItem(MENSAJES_KEY_AMIGO)
-    let mensajesList: Mensaje[] = []
-    
-    if (mensajesAmigo) {
-      try {
-        mensajesList = JSON.parse(mensajesAmigo)
-      } catch (e) {
-        mensajesList = []
-      }
-    }
-    
-    // Crear el mensaje desde la perspectiva del amigo (el remitente es el usuario actual)
-    const mensajeAmigo: Mensaje = {
-      ...mensaje,
-      id: mensaje.id + '-amigo',
-      remitente: nombreRemitente, // Nombre del usuario que envía (desde la perspectiva del amigo)
-      amigoId: mensaje.usuarioId, // El amigoId debe ser el ID del usuario que envía (desde la perspectiva del amigo)
-      esSistema: false
-    }
-    
-    mensajesList.push(mensajeAmigo)
-    localStorage.setItem(MENSAJES_KEY_AMIGO, JSON.stringify(mensajesList))
-  }
-}
-
-// Función para obtener amigo
-function getAmigo(amigoId: string, userId?: string): Amigo | null {
-  if (typeof window !== 'undefined') {
-    const usuarioId = userId || getUsuarioActual()?.id || 'default'
-    const AMIGOS_KEY_USER = `gestor-finanzas-amigos-${usuarioId}`
-    const amigos = localStorage.getItem(AMIGOS_KEY_USER)
-    if (amigos) {
-      const amigosList: Amigo[] = JSON.parse(amigos)
-      return amigosList.find(a => a.id === amigoId) || null
-    }
-  }
-  return null
 }
 
 export default function ChatPage() {
@@ -149,154 +77,137 @@ export default function ChatPage() {
   const amigoId = params?.amigoId as string
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  const [mensajes, setMensajes] = useState<Mensaje[]>([])
+  const [mensajes, setMensajes] = useState<MensajeChat[]>([])
   const [amigo, setAmigo] = useState<Amigo | null>(null)
   const [nuevoMensaje, setNuevoMensaje] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingMensajes, setLoadingMensajes] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Verificar autenticación y cargar datos
   useEffect(() => {
-    const isAuthenticated = getAuth()
-    if (!isAuthenticated) {
-      router.push('/login')
-      return
-    }
+    const loadAmigo = async () => {
+      const isAuthenticated = getAuth()
+      if (!isAuthenticated) {
+        router.push('/login')
+        return
+      }
 
-    if (amigoId) {
-      const usuarioActual = getUsuarioActual()
-      if (usuarioActual) {
-        const amigoData = getAmigo(amigoId, usuarioActual.id)
-        if (!amigoData) {
-          router.push('/dashboard/amigos')
-          return
+      if (amigoId) {
+        const usuarioActual = getUsuarioActual()
+        if (usuarioActual) {
+          const amigoData = await getAmigo(amigoId)
+          if (!amigoData) {
+            // Si no se encuentra el amigo, redirigir a mensajes
+            router.push('/dashboard/mensajes')
+            return
+          }
+          
+          // Validar que el amigo esté activo (amistad mutua requerida para chatear)
+          if (amigoData.estado !== 'activo') {
+            console.warn('⚠️ Intento de chatear con amigo no activo:', {
+              amigoId: amigoData.id,
+              estado: amigoData.estado,
+            })
+            alert('Solo puedes chatear con amigos activos. La amistad debe ser mutua.')
+            router.push('/dashboard/mensajes')
+            return
+          }
+          
+          setAmigo(amigoData)
         }
-        setAmigo(amigoData)
-        loadMensajes()
-        
-        // Removido el mensaje mock automático para evitar interferencias
       }
     }
+
+    loadAmigo()
   }, [amigoId, router])
+
+  // Cargar mensajes cuando el amigo esté disponible
+  useEffect(() => {
+    if (amigo && amigoId) {
+      loadMensajes()
+      // Marcar mensajes como leídos al abrir el chat
+      markAsLeido()
+    }
+  }, [amigo, amigoId])
 
   // Scroll automático al final cuando hay nuevos mensajes
   useEffect(() => {
     scrollToBottom()
   }, [mensajes])
 
-  // Listener para detectar cambios en localStorage y recargar mensajes
+  // Polling para recibir nuevos mensajes (cada 3 segundos)
   useEffect(() => {
-    const usuarioActual = getUsuarioActual()
-    if (!usuarioActual || !amigoId) return
+    if (!amigo || !amigoId) return
 
-    const MENSAJES_KEY = `gestor-finanzas-mensajes-${usuarioActual.id}`
-    
-    // Función para manejar cambios en localStorage
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === MENSAJES_KEY) {
-        console.log('🔄 Cambio detectado en localStorage, recargando mensajes...')
-        loadMensajes()
-      }
-    }
-
-    // Escuchar cambios en localStorage (desde otras pestañas/ventanas)
-    window.addEventListener('storage', handleStorageChange)
-
-    // También verificar periódicamente si hay nuevos mensajes (para cambios en la misma pestaña)
     const intervalId = setInterval(() => {
-      const mensajesActuales = getMensajesUsuario(usuarioActual.id)
-      
-      // Filtrar mensajes de este chat usando la misma lógica que loadMensajes
-      const mensajesFiltrados = mensajesActuales.filter(m => {
-        if (m.amigoId === amigoId) {
-          return true
-        }
-        if (m.usuarioId === amigoId && m.amigoId === usuarioActual.id) {
-          return true
-        }
-        return false
-      })
-      
-      if (mensajesFiltrados.length !== mensajes.length) {
-        console.log('🔄 Nuevos mensajes detectados, recargando...', {
-          anteriores: mensajes.length,
-          nuevos: mensajesFiltrados.length,
-          mensajesNuevos: mensajesFiltrados.filter(m => 
-            !mensajes.some(msg => msg.id === m.id)
-          ).map(m => ({
-            id: m.id,
-            remitente: m.remitente,
-            contenido: m.contenido.substring(0, 50) + '...'
-          }))
-        })
-        loadMensajes()
-      }
-    }, 1000) // Verificar cada 1 segundo para una respuesta más rápida
+      loadMensajes(true) // Cargar en modo silencioso para no mostrar loading cada vez
+    }, 3000) // Verificar cada 3 segundos
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange)
       clearInterval(intervalId)
     }
-  }, [amigoId, mensajes.length])
+  }, [amigo, amigoId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Función para cargar mensajes del chat
-  const loadMensajes = () => {
-    const usuarioActual = getUsuarioActual()
-    if (!usuarioActual) return
-    
-    const todosMensajes = getMensajesUsuario(usuarioActual.id)
-    
-    // Log para depuración
-    console.log('🔍 Cargando mensajes del chat:', {
-      usuarioActual: usuarioActual.id,
-      amigoId: amigoId,
-      totalMensajes: todosMensajes.length,
-      todosMensajes: todosMensajes.map(m => ({
-        id: m.id,
-        remitente: m.remitente,
-        amigoId: m.amigoId,
-        usuarioId: m.usuarioId,
-        contenido: m.contenido.substring(0, 50) + '...'
-      }))
-    })
-    
-    // Filtrar mensajes de este amigo
-    // Un mensaje pertenece a este chat si:
-    // 1. El amigoId del mensaje coincide con el amigoId del chat (mensajes recibidos del amigo)
-    // 2. O el usuarioId del mensaje coincide con el amigoId del chat Y el amigoId del mensaje coincide con el usuario actual (mensajes enviados por el amigo)
-    const mensajesChat = todosMensajes.filter(m => {
-      // Caso 1: Mensaje recibido del amigo (el amigo envió el mensaje al usuario actual)
-      if (m.amigoId === amigoId) {
-        return true
-      }
-      // Caso 2: Mensaje enviado por el amigo (el amigo está en el chat con el usuario actual)
-      if (m.usuarioId === amigoId && m.amigoId === usuarioActual.id) {
-        return true
-      }
-      return false
-    })
-    
-    console.log('📨 Mensajes filtrados para el chat:', {
-      filtrados: mensajesChat.length,
-      filtro: {
-        amigoId: amigoId,
-        usuarioActual: usuarioActual.id
-      },
-      mensajes: mensajesChat.map(m => ({
-        id: m.id,
-        remitente: m.remitente,
-        amigoId: m.amigoId,
-        usuarioId: m.usuarioId,
-        contenido: m.contenido.substring(0, 50) + '...'
-      }))
-    })
-    
-    // Ordenar por fecha (más antiguos primero)
-    mensajesChat.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
-    setMensajes(mensajesChat)
+  // Función para cargar mensajes del chat desde el backend
+  const loadMensajes = async (silent = false) => {
+    if (!amigo) return
+
+    try {
+      if (!silent) setLoadingMensajes(true)
+      setError(null)
+      
+      // El backend espera el _id del registro de amistad, no el userId
+      const usuarioActual = getUsuarioActual()
+      console.log('📥 Cargando mensajes:', {
+        amigoId: amigo.id,
+        userId: amigo.userId,
+        amigoNombre: amigo.nombre,
+        usuarioActualId: usuarioActual?.id,
+        usuarioActualEmail: usuarioActual?.email,
+      })
+      
+      const mensajesData = await chatService.getMensajesByAmigo(amigo.id)
+      
+      console.log('📨 Mensajes recibidos del backend:', {
+        cantidad: mensajesData.length,
+        mensajes: mensajesData.map(m => ({
+          id: m._id,
+          remitenteId: m.remitenteId,
+          destinatarioId: m.destinatarioId,
+          contenido: m.contenido.substring(0, 30) + '...',
+          createdAt: m.createdAt,
+        })),
+      })
+      
+      // Ordenar por fecha (más antiguos primero)
+      mensajesData.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      
+      setMensajes(mensajesData)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al cargar mensajes'
+      setError(errorMessage)
+      console.error('Error al cargar mensajes:', err)
+    } finally {
+      setLoadingMensajes(false)
+    }
+  }
+
+  // Función para marcar mensajes como leídos
+  const markAsLeido = async () => {
+    if (!amigo) return
+
+    try {
+      // El backend espera el _id del registro de amistad
+      await chatService.markChatAsLeido(amigo.id)
+    } catch (err) {
+      console.error('Error al marcar mensajes como leídos:', err)
+      // No mostrar error al usuario, es una operación silenciosa
+    }
   }
 
   // Función para enviar mensaje
@@ -305,33 +216,69 @@ export default function ChatPage() {
     if (!nuevoMensaje.trim() || !amigo) return
 
     const usuarioActual = getUsuarioActual()
-    if (!usuarioActual) return
-
-    setLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 200))
-
-    const todosMensajes = getMensajesUsuario(usuarioActual.id)
-    const nuevoMensajeObj: Mensaje = {
-      id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
-      remitente: 'Tú',
-      asunto: `Chat con ${amigo.nombre}`,
-      contenido: nuevoMensaje.trim(),
-      fecha: new Date().toISOString(),
-      leido: true,
-      amigoId: amigoId,
-      usuarioId: usuarioActual.id,
-      esSistema: false
+    if (!usuarioActual) {
+      console.error('❌ Usuario actual no encontrado')
+      router.push('/login')
+      return
     }
 
-    todosMensajes.push(nuevoMensajeObj)
-    saveMensajesUsuario(usuarioActual.id, todosMensajes)
-    
-    // También guardar el mensaje en el chat del amigo para que lo vea cuando inicie sesión
-    saveMensajeAmigo(amigoId, nuevoMensajeObj, usuarioActual.nombre)
-    
-    setNuevoMensaje('')
-    loadMensajes()
-    setLoading(false)
+    setLoading(true)
+    setError(null)
+
+    try {
+      // El backend espera el _id del registro de amistad para identificar la relación
+      // Internamente el backend usa el userId del amigo para crear el mensaje
+      console.log('📤 Enviando mensaje:', {
+        amigoId: amigo.id, // _id del registro de amistad
+        userId: amigo.userId, // ID del usuario amigo (destinatario)
+        amigoNombre: amigo.nombre,
+        amigoEmail: amigo.email,
+        remitenteId: usuarioActual.id, // ID del usuario actual (remitente)
+        remitenteEmail: usuarioActual.email,
+        contenido: nuevoMensaje.trim().substring(0, 50) + '...',
+      })
+      
+      const mensajeEnviado = await chatService.sendMensaje(amigo.id, {
+        contenido: nuevoMensaje.trim(),
+        esSistema: false,
+      })
+
+      console.log('✅ Mensaje enviado exitosamente:', {
+        mensajeId: mensajeEnviado._id,
+        remitenteId: mensajeEnviado.remitenteId,
+        destinatarioId: mensajeEnviado.destinatarioId,
+        amigoId: mensajeEnviado.amigoId,
+      })
+
+      // Agregar el mensaje a la lista localmente (optimistic update)
+      setMensajes(prev => [...prev, mensajeEnviado])
+      setNuevoMensaje('')
+      
+      // Scroll al final
+      setTimeout(() => scrollToBottom(), 100)
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Error al enviar mensaje'
+      setError(errorMessage)
+      
+      console.error('❌ Error al enviar mensaje:', {
+        error: err,
+        errorMessage: errorMessage,
+        errorStatus: err?.status,
+        amigoId: amigo.id, // _id del registro de amistad
+        userId: amigo.userId, // ID del usuario amigo (destinatario)
+        amigoNombre: amigo.nombre,
+        amigoEmail: amigo.email,
+        remitenteId: usuarioActual?.id,
+        remitenteEmail: usuarioActual?.email,
+      })
+      
+      // Si el error es que el usuario destinatario no existe, mostrar mensaje más claro
+      if (errorMessage.includes('destinatario no existe') || errorMessage.includes('usuario no existe')) {
+        setError(`Error: El usuario ${amigo.nombre} (${amigo.email}) no existe en el sistema. Verifica que el amigo esté correctamente registrado.`)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Función para obtener iniciales
@@ -380,7 +327,7 @@ export default function ChatPage() {
       <div className="chat-container">
         {/* Header del chat */}
         <div className="chat-header">
-          <Link href="/dashboard/amigos" className="chat-back-btn">
+          <Link href="/dashboard/mensajes" className="chat-back-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
@@ -402,9 +349,21 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* Mensaje de error */}
+        {error && (
+          <div className="chat-error-banner">
+            <p>Error: {error}</p>
+            <button onClick={() => setError(null)} className="btn-close">×</button>
+          </div>
+        )}
+
         {/* Área de mensajes */}
         <div className="chat-messages-container">
-          {mensajes.length === 0 ? (
+          {loadingMensajes && mensajes.length === 0 ? (
+            <div className="chat-loading">
+              <p>Cargando mensajes...</p>
+            </div>
+          ) : mensajes.length === 0 ? (
             <div className="chat-empty">
               <p>No hay mensajes aún. ¡Comienza la conversación!</p>
             </div>
@@ -413,37 +372,51 @@ export default function ChatPage() {
               {mensajes.map((mensaje) => {
                 const usuarioActual = getUsuarioActual()
                 
+                // Obtener el userId del token JWT (es el ID real del usuario en MongoDB)
+                const token = getToken()
+                const decodedToken = token ? decodeToken(token) : null
+                const userIdFromToken = decodedToken?.userId || usuarioActual?.id || ''
+                
                 // Determinar si el mensaje es del usuario actual o del amigo
-                // Un mensaje es "mío" (enviado por el usuario actual) si:
-                // 1. El remitente es "Tú" (mensaje manual enviado por el usuario)
-                // 2. O el usuarioId del mensaje coincide con el usuario actual Y el amigoId coincide con el amigo actual
-                //    (significa que el usuario actual envió este mensaje a este amigo)
-                const esMio = mensaje.remitente === 'Tú' || 
-                              (mensaje.usuarioId === usuarioActual?.id && mensaje.amigoId === amigoId)
+                // El remitenteId es el ID del usuario que envió el mensaje (del backend/MongoDB)
+                // Usamos el userId del token JWT para comparar, ya que es el ID real en MongoDB
+                const remitenteIdStr = mensaje.remitenteId?.toString() || ''
+                const usuarioActualIdStr = userIdFromToken?.toString() || ''
+                
+                // Comparación directa de IDs
+                const esMio = remitenteIdStr === usuarioActualIdStr
+                
+                // Log de depuración para verificar la comparación (solo en desarrollo y solo los primeros mensajes)
+                if (process.env.NODE_ENV === 'development' && mensajes.indexOf(mensaje) < 3) {
+                  console.log('🔍 Comparando mensaje:', {
+                    mensajeId: mensaje._id,
+                    remitenteId: remitenteIdStr,
+                    usuarioActualId: usuarioActualIdStr,
+                    userIdFromToken: userIdFromToken,
+                    usuarioActualEmail: usuarioActual?.email,
+                    esMio: esMio,
+                    contenido: mensaje.contenido.substring(0, 30) + '...',
+                    igualdad: remitenteIdStr === usuarioActualIdStr,
+                  })
+                }
                 
                 const esSistema = mensaje.esSistema === true
-                
-                // Si el mensaje NO es mío, entonces es del amigo (recibido)
-                // Esto incluye:
-                // - Mensajes del sistema enviados por el amigo (usuarioId del amigo)
-                // - Mensajes manuales enviados por el amigo
-                const esDelAmigo = !esMio
+                const esDelAmigo = !esMio && !esSistema
                 
                 // Los mensajes se muestran a la derecha solo si fueron enviados por el usuario actual
-                // Todos los demás mensajes (recibidos del amigo) van a la izquierda
                 const mostrarDerecha = esMio
                 
                 return (
                   <div
-                    key={mensaje.id}
+                    key={mensaje._id}
                     className={`chat-message ${mostrarDerecha ? 'chat-message-mio' : ''} ${esSistema && mostrarDerecha ? 'chat-message-sistema' : ''}`}
                   >
                     <div className="chat-message-content">
                       {esDelAmigo && (
-                        <div className="chat-message-remitente">{amigo?.nombre || mensaje.remitente}</div>
+                        <div className="chat-message-remitente">{amigo?.nombre || 'Amigo'}</div>
                       )}
                       <div className="chat-message-text">{mensaje.contenido}</div>
-                      <div className="chat-message-fecha">{formatFecha(mensaje.fecha)}</div>
+                      <div className="chat-message-fecha">{formatFecha(mensaje.createdAt)}</div>
                     </div>
                   </div>
                 )
@@ -478,4 +451,3 @@ export default function ChatPage() {
     </div>
   )
 }
-

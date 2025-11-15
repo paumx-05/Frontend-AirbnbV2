@@ -7,23 +7,52 @@ import type { Amigo as BackendAmigo } from '@/models/amigos'
 
 // Interfaz local para compatibilidad con código existente
 export interface Amigo {
-  id: string
+  id: string // ID del registro de amistad (_id)
+  userId: string // ID del usuario actual
+  amigoUserId: string // ID del usuario amigo
   nombre: string
   email: string
   avatar?: string
-  fechaAmistad: string
-  estado: 'activo' | 'pendiente' | 'bloqueado'
+  fechaAmistad?: string // Solo para amigos activos
+  estado: 'activo' | 'pendiente' | 'rechazada' | 'bloqueado'
+  solicitadoPor?: string // ID del usuario que envió la solicitud
+}
+
+// Usuario con estado de amistad (para búsqueda)
+export interface UsuarioConEstado {
+  _id: string
+  nombre: string
+  email: string
+  avatar?: string | null
+  estadoAmistad: 'pendiente' | 'activo' | 'rechazada' | 'bloqueado' | null
+  esAmigo: boolean
+}
+
+// Solicitud de amistad recibida
+export interface SolicitudAmistad {
+  _id: string
+  solicitante: {
+    _id: string
+    nombre: string
+    email: string
+    avatar?: string | null
+  }
+  estado: 'pendiente'
+  createdAt: string
 }
 
 // Función helper para convertir Amigo del backend a Amigo local
 function adaptBackendAmigoToLocal(backendAmigo: BackendAmigo): Amigo {
   return {
-    id: backendAmigo._id,
+    id: backendAmigo._id, // ID del registro de amistad
+    userId: backendAmigo.userId, // ID del usuario actual
+    amigoUserId: backendAmigo.amigoUserId, // ID del usuario amigo
     nombre: backendAmigo.nombre,
     email: backendAmigo.email,
     avatar: backendAmigo.avatar || undefined,
     fechaAmistad: backendAmigo.fechaAmistad,
     estado: backendAmigo.estado,
+    solicitadoPor: backendAmigo.solicitadoPor,
   }
 }
 
@@ -64,7 +93,7 @@ export async function searchAmigos(query: string): Promise<Amigo[]> {
 }
 
 // Función para obtener amigos por estado
-export async function getAmigosByEstado(estado: 'activo' | 'pendiente' | 'bloqueado'): Promise<Amigo[]> {
+export async function getAmigosByEstado(estado: 'activo' | 'pendiente' | 'rechazada' | 'bloqueado'): Promise<Amigo[]> {
   try {
     const amigos = await amigosService.getAmigosByEstado(estado)
     return amigos.map(adaptBackendAmigoToLocal)
@@ -112,7 +141,7 @@ export async function updateAmigo(id: string, data: {
 }
 
 // Función para actualizar el estado de un amigo
-export async function updateEstadoAmigo(id: string, estado: 'activo' | 'pendiente' | 'bloqueado'): Promise<Amigo> {
+export async function updateEstadoAmigo(id: string, estado: 'activo' | 'pendiente' | 'rechazada' | 'bloqueado'): Promise<Amigo> {
   try {
     const amigo = await amigosService.updateEstadoAmigo(id, estado)
     return adaptBackendAmigoToLocal(amigo)
@@ -128,6 +157,60 @@ export async function deleteAmigo(id: string): Promise<void> {
     await amigosService.deleteAmigo(id)
   } catch (error: any) {
     console.error('Error al eliminar amigo:', error)
+    throw error
+  }
+}
+
+// Función para buscar usuarios del sistema (no solo amigos)
+export async function searchUsuarios(query: string): Promise<UsuarioConEstado[]> {
+  try {
+    if (!query || query.trim().length === 0) {
+      return []
+    }
+    return await amigosService.searchUsuarios(query.trim())
+  } catch (error) {
+    console.error('Error al buscar usuarios:', error)
+    return []
+  }
+}
+
+// Función para enviar solicitud de amistad
+export async function enviarSolicitud(amigoUserId: string): Promise<Amigo> {
+  try {
+    const amigo = await amigosService.enviarSolicitud(amigoUserId)
+    return adaptBackendAmigoToLocal(amigo)
+  } catch (error: any) {
+    console.error('Error al enviar solicitud:', error)
+    throw error
+  }
+}
+
+// Función para obtener solicitudes recibidas
+export async function getSolicitudesRecibidas(): Promise<SolicitudAmistad[]> {
+  try {
+    return await amigosService.getSolicitudesRecibidas()
+  } catch (error) {
+    console.error('Error al obtener solicitudes:', error)
+    return []
+  }
+}
+
+// Función para aceptar solicitud de amistad
+export async function aceptarSolicitud(solicitudId: string): Promise<void> {
+  try {
+    await amigosService.aceptarSolicitud(solicitudId)
+  } catch (error: any) {
+    console.error('Error al aceptar solicitud:', error)
+    throw error
+  }
+}
+
+// Función para rechazar solicitud de amistad
+export async function rechazarSolicitud(solicitudId: string): Promise<void> {
+  try {
+    await amigosService.rechazarSolicitud(solicitudId)
+  } catch (error: any) {
+    console.error('Error al rechazar solicitud:', error)
     throw error
   }
 }

@@ -1,8 +1,8 @@
 'use client'
 
 // Página de Amigos
-// Permite gestionar la lista de amigos del usuario
-// Integración completa con API del backend
+// Sistema completo de solicitudes de amistad
+// Flujo: Buscar usuarios → Enviar solicitud → Aceptar/Rechazar → Chatear (solo activos mutuos)
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -10,27 +10,39 @@ import Link from 'next/link'
 import { getAuth } from '@/lib/auth'
 import { 
   getAmigos, 
-  createAmigo, 
-  deleteAmigo, 
-  updateEstadoAmigo,
-  searchAmigos,
-  getAmigosByEstado,
-  type Amigo 
+  searchUsuarios,
+  enviarSolicitud,
+  getSolicitudesRecibidas,
+  aceptarSolicitud,
+  rechazarSolicitud,
+  deleteAmigo,
+  type Amigo,
+  type UsuarioConEstado,
+  type SolicitudAmistad
 } from '@/lib/amigos'
+
+type Tab = 'amigos' | 'buscar' | 'solicitudes'
 
 export default function AmigosPage() {
   const router = useRouter()
+  const [tabActivo, setTabActivo] = useState<Tab>('amigos')
+  
+  // Estado para amigos
   const [amigos, setAmigos] = useState<Amigo[]>([])
-  const [busqueda, setBusqueda] = useState('')
-  const [filtro, setFiltro] = useState<'todos' | 'activos' | 'pendientes' | 'bloqueados'>('todos')
-  const [mostrarFormulario, setMostrarFormulario] = useState(false)
-  const [nombreAmigo, setNombreAmigo] = useState('')
-  const [emailAmigo, setEmailAmigo] = useState('')
-  const [loading, setLoading] = useState(false)
   const [loadingAmigos, setLoadingAmigos] = useState(true)
+  
+  // Estado para búsqueda de usuarios
+  const [busquedaUsuarios, setBusquedaUsuarios] = useState('')
+  const [usuariosEncontrados, setUsuariosEncontrados] = useState<UsuarioConEstado[]>([])
+  const [loadingBusqueda, setLoadingBusqueda] = useState(false)
+  
+  // Estado para solicitudes
+  const [solicitudes, setSolicitudes] = useState<SolicitudAmistad[]>([])
+  const [loadingSolicitudes, setLoadingSolicitudes] = useState(true)
+  
   const [error, setError] = useState<string | null>(null)
 
-  // Verificar autenticación y cargar amigos
+  // Verificar autenticación y cargar datos iniciales
   useEffect(() => {
     const isAuthenticated = getAuth()
     if (!isAuthenticated) {
@@ -39,9 +51,10 @@ export default function AmigosPage() {
     }
 
     loadAmigos()
+    loadSolicitudes()
   }, [router])
 
-  // Cargar amigos desde el backend
+  // Cargar amigos (solo activos)
   const loadAmigos = async () => {
     setLoadingAmigos(true)
     setError(null)
@@ -58,66 +71,126 @@ export default function AmigosPage() {
     }
   }
 
-  // Buscar y filtrar amigos cuando cambian los parámetros
+  // Cargar solicitudes recibidas
+  const loadSolicitudes = async () => {
+    setLoadingSolicitudes(true)
+    setError(null)
+    
+    try {
+      const solicitudesData = await getSolicitudesRecibidas()
+      setSolicitudes(solicitudesData)
+    } catch (err: any) {
+      console.error('Error al cargar solicitudes:', err)
+      setError(err.message || 'Error al cargar las solicitudes')
+      setSolicitudes([])
+    } finally {
+      setLoadingSolicitudes(false)
+    }
+  }
+
+  // Buscar usuarios del sistema
   useEffect(() => {
-    const cargarAmigos = async () => {
+    if (tabActivo !== 'buscar') return
+    
+    const buscarUsuarios = async () => {
+      if (!busquedaUsuarios.trim()) {
+        setUsuariosEncontrados([])
+        return
+      }
+
       try {
-        setLoadingAmigos(true)
-        let amigosData: Amigo[] = []
-        
-        // Si hay búsqueda, usar búsqueda del backend
-        if (busqueda.trim()) {
-          amigosData = await searchAmigos(busqueda)
-        } 
-        // Si hay filtro de estado (sin búsqueda), usar filtro del backend
-        else if (filtro !== 'todos') {
-          const estado = filtro === 'activos' ? 'activo' : filtro === 'pendientes' ? 'pendiente' : 'bloqueado'
-          amigosData = await getAmigosByEstado(estado)
-        }
-        // Si no hay filtros, cargar todos
-        else {
-          amigosData = await getAmigos()
-        }
-        
-        setAmigos(amigosData)
+        setLoadingBusqueda(true)
+        const usuarios = await searchUsuarios(busquedaUsuarios.trim())
+        setUsuariosEncontrados(usuarios)
         setError(null)
       } catch (err: any) {
-        console.error('Error al cargar amigos:', err)
-        setError(err.message || 'Error al cargar los amigos')
-        setAmigos([])
+        console.error('Error al buscar usuarios:', err)
+        setError(err.message || 'Error al buscar usuarios')
+        setUsuariosEncontrados([])
       } finally {
-        setLoadingAmigos(false)
+        setLoadingBusqueda(false)
       }
     }
-    
-    // Debounce para búsqueda: esperar 300ms después de que el usuario deje de escribir
-    if (busqueda.trim()) {
-      const timeoutId = setTimeout(cargarAmigos, 300)
-      return () => clearTimeout(timeoutId)
-    } else {
-      cargarAmigos()
-    }
-  }, [busqueda, filtro])
 
-  // Filtrar amigos localmente (para cuando hay búsqueda y filtro simultáneos)
-  const amigosFiltrados = amigos.filter(amigo => {
-    // Filtro por estado
-    if (filtro !== 'todos') {
-      const estadoEsperado = filtro === 'activos' ? 'activo' : filtro === 'pendientes' ? 'pendiente' : 'bloqueado'
-      if (amigo.estado !== estadoEsperado) {
-        return false
-      }
+    // Debounce: esperar 500ms después de que el usuario deje de escribir
+    const timeoutId = setTimeout(buscarUsuarios, 500)
+    return () => clearTimeout(timeoutId)
+  }, [busquedaUsuarios, tabActivo])
+
+  // Función para enviar solicitud de amistad
+  const handleEnviarSolicitud = async (amigoUserId: string) => {
+    try {
+      setError(null)
+      await enviarSolicitud(amigoUserId)
+      
+      // Actualizar estado del usuario en la lista
+      setUsuariosEncontrados(usuariosEncontrados.map(u => 
+        u._id === amigoUserId 
+          ? { ...u, estadoAmistad: 'pendiente', esAmigo: false }
+          : u
+      ))
+      
+      // Mostrar mensaje de éxito
+      alert('Solicitud enviada exitosamente')
+    } catch (err: any) {
+      const errorMessage = err.message || 'Error al enviar solicitud'
+      setError(errorMessage)
+      alert(errorMessage)
     }
-    // Búsqueda por nombre o email (si hay búsqueda activa)
-    if (busqueda.trim()) {
-      const busquedaLower = busqueda.toLowerCase()
-      return (
-        amigo.nombre.toLowerCase().includes(busquedaLower) ||
-        amigo.email.toLowerCase().includes(busquedaLower)
-      )
+  }
+
+  // Función para aceptar solicitud
+  const handleAceptarSolicitud = async (solicitudId: string) => {
+    try {
+      setError(null)
+      await aceptarSolicitud(solicitudId)
+      
+      // Recargar solicitudes y amigos
+      await loadSolicitudes()
+      await loadAmigos()
+      
+      alert('Solicitud aceptada. ¡Ahora son amigos!')
+    } catch (err: any) {
+      const errorMessage = err.message || 'Error al aceptar solicitud'
+      setError(errorMessage)
+      alert(errorMessage)
     }
-    return true
-  })
+  }
+
+  // Función para rechazar solicitud
+  const handleRechazarSolicitud = async (solicitudId: string) => {
+    try {
+      setError(null)
+      await rechazarSolicitud(solicitudId)
+      
+      // Recargar solicitudes
+      await loadSolicitudes()
+      
+      alert('Solicitud rechazada')
+    } catch (err: any) {
+      const errorMessage = err.message || 'Error al rechazar solicitud'
+      setError(errorMessage)
+      alert(errorMessage)
+    }
+  }
+
+  // Función para eliminar amigo
+  const handleEliminarAmigo = async (id: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este amigo?')) {
+      return
+    }
+
+    try {
+      setError(null)
+      await deleteAmigo(id)
+      setAmigos(amigos.filter(amigo => amigo.id !== id))
+      alert('Amigo eliminado exitosamente')
+    } catch (err: any) {
+      const errorMessage = err.message || 'Error al eliminar amigo'
+      setError(errorMessage)
+      alert(errorMessage)
+    }
+  }
 
   // Función para obtener iniciales del nombre
   const getInitials = (name: string) => {
@@ -129,61 +202,14 @@ export default function AmigosPage() {
     return name[0].toUpperCase()
   }
 
-  // Función para agregar amigo
-  const agregarAmigo = async () => {
-    if (!nombreAmigo.trim() || !emailAmigo.trim()) {
-      alert('Por favor completa todos los campos')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const nuevoAmigo = await createAmigo({
-        nombre: nombreAmigo.trim(),
-        email: emailAmigo.trim(),
-        estado: 'activo'
-      })
-      
-      setAmigos([...amigos, nuevoAmigo])
-      setNombreAmigo('')
-      setEmailAmigo('')
-      setMostrarFormulario(false)
-    } catch (err: any) {
-      console.error('Error al crear amigo:', err)
-      alert(err.message || 'Error al agregar el amigo. Por favor, intenta nuevamente.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Función para eliminar amigo
-  const eliminarAmigo = async (id: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este amigo?')) {
-      try {
-        await deleteAmigo(id)
-        setAmigos(amigos.filter(amigo => amigo.id !== id))
-      } catch (err: any) {
-        console.error('Error al eliminar amigo:', err)
-        alert(err.message || 'Error al eliminar el amigo. Por favor, intenta nuevamente.')
-      }
-    }
-  }
-
-  // Función para cambiar estado de amigo
-  const cambiarEstado = async (id: string, nuevoEstado: Amigo['estado']) => {
-    try {
-      const amigoActualizado = await updateEstadoAmigo(id, nuevoEstado)
-      setAmigos(amigos.map(amigo =>
-        amigo.id === id ? amigoActualizado : amigo
-      ))
-    } catch (err: any) {
-      console.error('Error al actualizar estado:', err)
-      alert(err.message || 'Error al actualizar el estado. Por favor, intenta nuevamente.')
-    }
-  }
-
-  const contarPorEstado = (estado: Amigo['estado']) => {
-    return amigos.filter(amigo => amigo.estado === estado).length
+  // Función para formatear fecha
+  const formatFecha = (fechaStr: string) => {
+    const fecha = new Date(fechaStr)
+    return fecha.toLocaleDateString('es-ES', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric'
+    })
   }
 
   return (
@@ -194,223 +220,256 @@ export default function AmigosPage() {
           <div>
             <h1 className="amigos-title">Amigos</h1>
             <p className="amigos-subtitle">
-              {amigos.length > 0 
-                ? `${amigos.length} amigo${amigos.length > 1 ? 's' : ''} en tu lista`
-                : 'No tienes amigos agregados'}
+              {tabActivo === 'amigos' && `${amigos.length} amigo${amigos.length !== 1 ? 's' : ''} activo${amigos.length !== 1 ? 's' : ''}`}
+              {tabActivo === 'buscar' && 'Buscar usuarios del sistema'}
+              {tabActivo === 'solicitudes' && `${solicitudes.length} solicitud${solicitudes.length !== 1 ? 'es' : ''} pendiente${solicitudes.length !== 1 ? 's' : ''}`}
             </p>
           </div>
+        </div>
+
+        {/* Tabs de navegación */}
+        <div className="amigos-tabs">
           <button
-            onClick={() => setMostrarFormulario(!mostrarFormulario)}
-            className="btn btn-primary"
+            onClick={() => setTabActivo('amigos')}
+            className={`amigos-tab ${tabActivo === 'amigos' ? 'active' : ''}`}
           >
-            {mostrarFormulario ? 'Cancelar' : '+ Agregar Amigo'}
+            Mis Amigos ({amigos.length})
+          </button>
+          <button
+            onClick={() => setTabActivo('buscar')}
+            className={`amigos-tab ${tabActivo === 'buscar' ? 'active' : ''}`}
+          >
+            Buscar Usuarios
+          </button>
+          <button
+            onClick={() => setTabActivo('solicitudes')}
+            className={`amigos-tab ${tabActivo === 'solicitudes' ? 'active' : ''}`}
+          >
+            Solicitudes ({solicitudes.length})
           </button>
         </div>
 
-        {/* Formulario para agregar amigo */}
-        {mostrarFormulario && (
-          <div className="amigos-form-card">
-            <h3 className="amigos-form-title">Agregar Nuevo Amigo</h3>
-            <div className="amigos-form">
-              <div className="form-group">
-                <label htmlFor="nombre" className="form-label">Nombre</label>
-                <input
-                  type="text"
-                  id="nombre"
-                  className="form-input"
-                  placeholder="Nombre completo"
-                  value={nombreAmigo}
-                  onChange={(e) => setNombreAmigo(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="email" className="form-label">Email</label>
-                <input
-                  type="email"
-                  id="email"
-                  className="form-input"
-                  placeholder="email@ejemplo.com"
-                  value={emailAmigo}
-                  onChange={(e) => setEmailAmigo(e.target.value)}
-                />
-              </div>
-              <button
-                onClick={agregarAmigo}
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                {loading ? 'Agregando...' : 'Agregar Amigo'}
-              </button>
-            </div>
+        {/* Mensaje de error */}
+        {error && (
+          <div className="amigos-error-banner">
+            <p>Error: {error}</p>
+            <button onClick={() => setError(null)} className="btn-close">×</button>
           </div>
         )}
 
-        {/* Barra de búsqueda y filtros */}
-        <div className="amigos-controls">
-          <div className="amigos-search">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input
-              type="text"
-              className="amigos-search-input"
-              placeholder="Buscar por nombre o email..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-          </div>
-          <div className="amigos-filtros">
-            <button
-              onClick={() => setFiltro('todos')}
-              className={`btn-filtro ${filtro === 'todos' ? 'active' : ''}`}
-            >
-              Todos ({amigos.length})
-            </button>
-            <button
-              onClick={() => setFiltro('activos')}
-              className={`btn-filtro ${filtro === 'activos' ? 'active' : ''}`}
-            >
-              Activos ({contarPorEstado('activo')})
-            </button>
-            <button
-              onClick={() => setFiltro('pendientes')}
-              className={`btn-filtro ${filtro === 'pendientes' ? 'active' : ''}`}
-            >
-              Pendientes ({contarPorEstado('pendiente')})
-            </button>
-            <button
-              onClick={() => setFiltro('bloqueados')}
-              className={`btn-filtro ${filtro === 'bloqueados' ? 'active' : ''}`}
-            >
-              Bloqueados ({contarPorEstado('bloqueado')})
-            </button>
-          </div>
-        </div>
-
-        {/* Lista de amigos */}
-        <div className="amigos-lista">
-          {loadingAmigos ? (
-            <div className="amigos-empty">
-              <p>Cargando amigos...</p>
-            </div>
-          ) : error ? (
-            <div className="amigos-empty">
-              <p style={{ color: 'red' }}>Error: {error}</p>
-              <button 
-                onClick={loadAmigos}
-                className="btn btn-primary"
-                style={{ marginTop: '10px' }}
-              >
-                Reintentar
-              </button>
-            </div>
-          ) : amigosFiltrados.length === 0 ? (
-            <div className="amigos-empty">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              <p>
-                {busqueda.trim() || filtro !== 'todos'
-                  ? 'No se encontraron amigos con los filtros seleccionados'
-                  : 'No tienes amigos agregados. ¡Agrega tu primer amigo!'}
-              </p>
-            </div>
-          ) : (
-            <div className="amigos-grid">
-              {amigosFiltrados.map((amigo) => (
-                <div key={amigo.id} className="amigo-card">
-                  <div className="amigo-avatar">
-                    {amigo.avatar ? (
-                      <img src={amigo.avatar} alt={amigo.nombre} className="amigo-avatar-image" />
-                    ) : (
-                      <div className="amigo-avatar-placeholder">
-                        {getInitials(amigo.nombre)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="amigo-info">
-                    <h3 className="amigo-nombre">{amigo.nombre}</h3>
-                    <p className="amigo-email">{amigo.email}</p>
-                    <span className={`amigo-estado estado-${amigo.estado}`}>
-                      {amigo.estado === 'activo' && 'Activo'}
-                      {amigo.estado === 'pendiente' && 'Pendiente'}
-                      {amigo.estado === 'bloqueado' && 'Bloqueado'}
-                    </span>
-                    <p className="amigo-fecha">
-                      Amigos desde {new Date(amigo.fechaAmistad).toLocaleDateString('es-ES', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                  <div className="amigo-actions">
-                    {/* Botón de chat - siempre visible */}
-                    <Link
-                      href={`/dashboard/chat/${amigo.id}`}
-                      className="btn-link btn-link-chat"
-                      title="Abrir chat"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                      </svg>
-                      Chat
-                    </Link>
-                    {amigo.estado === 'activo' && (
-                      <>
-                        <button
-                          onClick={() => cambiarEstado(amigo.id, 'pendiente')}
-                          className="btn-link"
-                          title="Marcar como pendiente"
+        {/* Contenido según tab activo */}
+        {tabActivo === 'amigos' && (
+          <div className="amigos-content">
+            {loadingAmigos ? (
+              <div className="amigos-empty">
+                <p>Cargando amigos...</p>
+              </div>
+            ) : amigos.length === 0 ? (
+              <div className="amigos-empty">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <p>No tienes amigos activos. Busca usuarios y envía solicitudes de amistad.</p>
+                <button
+                  onClick={() => setTabActivo('buscar')}
+                  className="btn btn-primary"
+                >
+                  Buscar Usuarios
+                </button>
+              </div>
+            ) : (
+              <div className="amigos-grid">
+                {amigos.map((amigo) => (
+                  <div key={amigo.id} className="amigo-card">
+                    <div className="amigo-avatar">
+                      {amigo.avatar ? (
+                        <img src={amigo.avatar} alt={amigo.nombre} className="amigo-avatar-image" />
+                      ) : (
+                        <div className="amigo-avatar-placeholder">
+                          {getInitials(amigo.nombre)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="amigo-info">
+                      <h3 className="amigo-nombre">{amigo.nombre}</h3>
+                      <p className="amigo-email">{amigo.email}</p>
+                      {amigo.fechaAmistad && (
+                        <p className="amigo-fecha">
+                          Amigos desde {formatFecha(amigo.fechaAmistad)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="amigo-actions">
+                      {/* Solo amigos activos pueden chatear */}
+                      {amigo.estado === 'activo' && (
+                        <Link
+                          href={`/dashboard/chat/${amigo.id}`}
+                          className="btn-link btn-link-chat"
+                          title="Abrir chat"
                         >
-                          Pendiente
-                        </button>
-                        <button
-                          onClick={() => cambiarEstado(amigo.id, 'bloqueado')}
-                          className="btn-link btn-link-warning"
-                          title="Bloquear amigo"
-                        >
-                          Bloquear
-                        </button>
-                      </>
-                    )}
-                    {amigo.estado === 'pendiente' && (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                          </svg>
+                          Chat
+                        </Link>
+                      )}
                       <button
-                        onClick={() => cambiarEstado(amigo.id, 'activo')}
-                        className="btn-link"
-                        title="Aceptar amigo"
+                        onClick={() => handleEliminarAmigo(amigo.id)}
+                        className="btn-link btn-link-danger"
+                        title="Eliminar amigo"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tabActivo === 'buscar' && (
+          <div className="amigos-content">
+            <div className="amigos-search-container">
+              <div className="amigos-search">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  type="text"
+                  className="amigos-search-input"
+                  placeholder="Buscar por nombre o email..."
+                  value={busquedaUsuarios}
+                  onChange={(e) => setBusquedaUsuarios(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {loadingBusqueda ? (
+              <div className="amigos-empty">
+                <p>Buscando usuarios...</p>
+              </div>
+            ) : busquedaUsuarios.trim() === '' ? (
+              <div className="amigos-empty">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <p>Escribe un nombre o email para buscar usuarios del sistema</p>
+              </div>
+            ) : usuariosEncontrados.length === 0 ? (
+              <div className="amigos-empty">
+                <p>No se encontraron usuarios con ese nombre o email</p>
+              </div>
+            ) : (
+              <div className="amigos-grid">
+                {usuariosEncontrados.map((usuario) => (
+                  <div key={usuario._id} className="amigo-card">
+                    <div className="amigo-avatar">
+                      {usuario.avatar ? (
+                        <img src={usuario.avatar} alt={usuario.nombre} className="amigo-avatar-image" />
+                      ) : (
+                        <div className="amigo-avatar-placeholder">
+                          {getInitials(usuario.nombre)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="amigo-info">
+                      <h3 className="amigo-nombre">{usuario.nombre}</h3>
+                      <p className="amigo-email">{usuario.email}</p>
+                      <span className={`amigo-estado estado-${usuario.estadoAmistad || 'sin-relacion'}`}>
+                        {usuario.estadoAmistad === 'activo' && '✓ Ya son amigos'}
+                        {usuario.estadoAmistad === 'pendiente' && 'Solicitud pendiente'}
+                        {usuario.estadoAmistad === 'rechazada' && 'Solicitud rechazada'}
+                        {usuario.estadoAmistad === 'bloqueado' && 'Bloqueado'}
+                        {!usuario.estadoAmistad && 'Sin relación'}
+                      </span>
+                    </div>
+                    <div className="amigo-actions">
+                      {!usuario.esAmigo && usuario.estadoAmistad !== 'pendiente' && usuario.estadoAmistad !== 'rechazada' && (
+                        <button
+                          onClick={() => handleEnviarSolicitud(usuario._id)}
+                          className="btn-link btn-link-primary"
+                          title="Enviar solicitud de amistad"
+                        >
+                          Enviar Solicitud
+                        </button>
+                      )}
+                      {usuario.estadoAmistad === 'pendiente' && (
+                        <span className="amigo-estado-badge">Solicitud pendiente</span>
+                      )}
+                      {usuario.esAmigo && (
+                        <span className="amigo-estado-badge">✓ Ya son amigos</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tabActivo === 'solicitudes' && (
+          <div className="amigos-content">
+            {loadingSolicitudes ? (
+              <div className="amigos-empty">
+                <p>Cargando solicitudes...</p>
+              </div>
+            ) : solicitudes.length === 0 ? (
+              <div className="amigos-empty">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                <p>No tienes solicitudes de amistad pendientes</p>
+              </div>
+            ) : (
+              <div className="amigos-grid">
+                {solicitudes.map((solicitud) => (
+                  <div key={solicitud._id} className="amigo-card">
+                    <div className="amigo-avatar">
+                      {solicitud.solicitante.avatar ? (
+                        <img src={solicitud.solicitante.avatar} alt={solicitud.solicitante.nombre} className="amigo-avatar-image" />
+                      ) : (
+                        <div className="amigo-avatar-placeholder">
+                          {getInitials(solicitud.solicitante.nombre)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="amigo-info">
+                      <h3 className="amigo-nombre">{solicitud.solicitante.nombre}</h3>
+                      <p className="amigo-email">{solicitud.solicitante.email}</p>
+                      <p className="amigo-fecha">
+                        Solicitud recibida el {formatFecha(solicitud.createdAt)}
+                      </p>
+                    </div>
+                    <div className="amigo-actions">
+                      <button
+                        onClick={() => handleAceptarSolicitud(solicitud._id)}
+                        className="btn-link btn-link-primary"
+                        title="Aceptar solicitud"
                       >
                         Aceptar
                       </button>
-                    )}
-                    {amigo.estado === 'bloqueado' && (
                       <button
-                        onClick={() => cambiarEstado(amigo.id, 'activo')}
-                        className="btn-link"
-                        title="Desbloquear amigo"
+                        onClick={() => handleRechazarSolicitud(solicitud._id)}
+                        className="btn-link btn-link-danger"
+                        title="Rechazar solicitud"
                       >
-                        Desbloquear
+                        Rechazar
                       </button>
-                    )}
-                    <button
-                      onClick={() => eliminarAmigo(amigo.id)}
-                      className="btn-link btn-link-danger"
-                      title="Eliminar amigo"
-                    >
-                      Eliminar
-                    </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
 }
-

@@ -30,14 +30,34 @@ export const API_CONFIG = {
       GET_BY_CATEGORIA: (mes: string, categoria: string) => `/api/gastos/${mes}/categoria/${encodeURIComponent(categoria)}`, // Obtener gastos por categoría
     },
     AMIGOS: {
-      GET_ALL: '/api/amigos', // Obtener todos los amigos
+      GET_ALL: '/api/amigos', // Obtener todos los amigos (solo activos)
       GET_BY_ID: (id: string) => `/api/amigos/${id}`, // Obtener amigo por ID
-      SEARCH: (query: string) => `/api/amigos/search?q=${encodeURIComponent(query)}`, // Buscar amigos
+      SEARCH: (query: string) => `/api/amigos/search?q=${encodeURIComponent(query)}`, // Buscar entre tus amigos
+      SEARCH_USUARIOS: (query: string) => `/api/amigos/usuarios/search?q=${encodeURIComponent(query)}`, // Buscar usuarios del sistema (NUEVO)
       GET_BY_ESTADO: (estado: string) => `/api/amigos/estado/${estado}`, // Obtener amigos por estado
-      CREATE: '/api/amigos', // Crear amigo
+      CREATE: '/api/amigos', // Crear amigo (DEPRECADO - usar ENVIAR_SOLICITUD)
+      ENVIAR_SOLICITUD: '/api/amigos/solicitud', // Enviar solicitud de amistad (NUEVO)
+      GET_SOLICITUDES: '/api/amigos/solicitudes', // Obtener solicitudes recibidas (NUEVO)
+      ACEPTAR_SOLICITUD: (id: string) => `/api/amigos/solicitud/${id}/aceptar`, // Aceptar solicitud (NUEVO)
+      RECHAZAR_SOLICITUD: (id: string) => `/api/amigos/solicitud/${id}/rechazar`, // Rechazar solicitud (NUEVO)
       UPDATE: (id: string) => `/api/amigos/${id}`, // Actualizar amigo
       UPDATE_ESTADO: (id: string) => `/api/amigos/${id}/estado`, // Actualizar estado de amigo
       DELETE: (id: string) => `/api/amigos/${id}`, // Eliminar amigo
+    },
+    MENSAJES: {
+      GET_ALL: (leido?: boolean) => leido !== undefined ? `/api/mensajes?leido=${leido}` : '/api/mensajes', // Obtener todos los mensajes (opcionalmente filtrado por leído)
+      GET_BY_ID: (id: string) => `/api/mensajes/${id}`, // Obtener mensaje por ID
+      CREATE: '/api/mensajes', // Crear mensaje
+      MARK_AS_LEIDO: (id: string) => `/api/mensajes/${id}/leido`, // Marcar mensaje como leído
+      MARK_ALL_AS_LEIDOS: '/api/mensajes/leer-todos', // Marcar todos los mensajes como leídos
+      DELETE: (id: string) => `/api/mensajes/${id}`, // Eliminar mensaje
+      DELETE_ALL: '/api/mensajes', // Eliminar todos los mensajes
+    },
+    CHAT: {
+      GET_CHATS: '/api/chat/amigos', // Obtener lista de chats con amigos
+      GET_MENSAJES: (amigoId: string) => `/api/chat/${amigoId}/mensajes`, // Obtener mensajes de un chat
+      SEND_MENSAJE: (amigoId: string) => `/api/chat/${amigoId}/mensajes`, // Enviar mensaje en un chat
+      MARK_AS_LEIDO: (amigoId: string) => `/api/chat/${amigoId}/leer`, // Marcar mensajes de un chat como leídos
     }
   },
   
