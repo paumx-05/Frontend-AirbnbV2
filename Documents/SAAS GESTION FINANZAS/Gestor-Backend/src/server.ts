@@ -7,8 +7,10 @@ import { authRoutes } from './routes/auth.routes';
 import { usersRoutes } from './routes/users.routes';
 import { amigoRoutes } from './routes/amigo.routes';
 import { gastoRoutes } from './routes/gasto.routes';
+import { ingresoRoutes } from './routes/ingreso.routes';
 import { mensajeRoutes } from './routes/mensaje.routes';
 import { chatRoutes } from './routes/chat.routes';
+import { notificacionRoutes } from './routes/notificacion.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 dotenv.config();
@@ -32,8 +34,10 @@ app.get('/', (_req, res) => {
       users: '/api/users',
       amigos: '/api/amigos',
       gastos: '/api/gastos',
+      ingresos: '/api/ingresos',
       mensajes: '/api/mensajes',
       chat: '/api/chat',
+      notificaciones: '/api/notificaciones',
       example: '/api/example'
     },
     timestamp: new Date().toISOString()
@@ -46,8 +50,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/amigos', amigoRoutes);
 app.use('/api/gastos', gastoRoutes);
+app.use('/api/ingresos', ingresoRoutes);
 app.use('/api/mensajes', mensajeRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/notificaciones', notificacionRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

@@ -322,6 +322,70 @@ export const markAsLeido = async (req: AuthRequest, res: Response): Promise<void
   }
 };
 
+// Marcar todos los mensajes de un chat como leídos
+export const markAllAsLeidos = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: 'Usuario no autenticado'
+      });
+      return;
+    }
+
+    const { amigoId } = req.params;
+
+    // Validar amigoId
+    if (!mongoose.Types.ObjectId.isValid(amigoId)) {
+      res.status(400).json({
+        success: false,
+        error: 'ID de amigo inválido'
+      });
+      return;
+    }
+
+    // Verificar que el amigo existe y pertenece al usuario
+    const amigo = await Amigo.findOne({ 
+      _id: amigoId, 
+      userId: req.user.userId 
+    });
+
+    if (!amigo) {
+      res.status(404).json({
+        success: false,
+        error: 'Amigo no encontrado'
+      });
+      return;
+    }
+
+    // Marcar TODOS los mensajes como leídos (incluso los que ya estaban leídos)
+    // Buscar basándose en la relación de amistad en lugar de solo amigoId
+    const result = await MensajeChat.updateMany(
+      {
+        remitenteId: amigo.amigoUserId,
+        destinatarioId: req.user.userId
+      },
+      {
+        $set: { leido: true }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        mensajesActualizados: result.modifiedCount
+      },
+      message: `${result.modifiedCount} mensaje(s) marcado(s) como leído(s)`
+    });
+  } catch (error) {
+    console.error('Error al marcar todos los mensajes como leídos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al marcar todos los mensajes como leídos'
+    });
+  }
+};
+
 // Obtener lista de chats con último mensaje
 export const getChatsList = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

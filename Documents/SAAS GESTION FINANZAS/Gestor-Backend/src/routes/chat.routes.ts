@@ -19,5 +19,8 @@ router.post('/:amigoId/mensajes', chatController.createMensaje);
 // PUT /api/chat/:amigoId/leer - Marcar mensajes como leídos
 router.put('/:amigoId/leer', chatController.markAsLeido);
 
+// PUT /api/chat/:amigoId/leer-todos - Marcar todos los mensajes como leídos
+router.put('/:amigoId/leer-todos', chatController.markAllAsLeidos);
+
 export { router as chatRoutes };
 
