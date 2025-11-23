@@ -5,12 +5,14 @@
 // Muestra resumen financiero del mes actual y métricas clave
 // Integración completa con backend MongoDB - NO USAR MOCK
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getAuth } from '@/lib/auth'
 import { dashboardService } from '@/services/dashboard.service'
 import { gastosService } from '@/services/gastos.service'
+import { useCartera } from '@/hooks/useCartera'
+import { API_CONFIG } from '@/config/api'
 import type {
   ResumenMesActual,
   GastoReciente,
@@ -86,6 +88,12 @@ export default function DashboardPage() {
   const mesActual = getMesActual()
   const nombreMesActual = getNombreMesActual()
   const nombreMesAnterior = getNombreMesAnterior()
+  const { carteraActivaId } = useCartera()
+
+  // Log para depuración cuando cambia carteraActivaId
+  useEffect(() => {
+    console.log('[DASHBOARD] carteraActivaId cambió:', carteraActivaId)
+  }, [carteraActivaId])
 
   // Estados
   const [resumen, setResumen] = useState<ResumenMesActual | null>(null)
@@ -96,21 +104,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Verificar autenticación al cargar
-  useEffect(() => {
-    const isAuthenticated = getAuth()
-    if (!isAuthenticated) {
-      router.push('/login')
-      return
-    }
-    loadDashboardData()
-  }, [router])
-
   // Función para calcular resumen por categorías desde todos los gastos
-  const calcularGastosPorCategoria = async (mes: string): Promise<GastosPorCategoriaResponse> => {
+  const calcularGastosPorCategoria = useCallback(async (mes: string, carteraId?: string | null): Promise<GastosPorCategoriaResponse> => {
     try {
-      // Obtener todos los gastos del mes
-      const { gastos, total } = await gastosService.getGastosByMes(mes)
+      console.log('[DASHBOARD] calcularGastosPorCategoria - mes:', mes, 'carteraId:', carteraId)
+      
+      // Obtener todos los gastos del mes (filtrados por cartera si se proporciona)
+      const { gastos, total } = await gastosService.getGastosByMes(mes, carteraId || undefined)
+      
+      console.log('[DASHBOARD] calcularGastosPorCategoria - gastos recibidos:', gastos.length, 'total:', total)
       
       // Calcular resumen por categorías
       const resumenPorCategoria: { [categoria: string]: number } = {}
@@ -133,47 +135,132 @@ export default function DashboardPage() {
         .filter(item => item.monto > 0) // Solo categorías con gastos
         .sort((a, b) => b.monto - a.monto) // Ordenar por monto descendente
       
+      console.log('[DASHBOARD] calcularGastosPorCategoria - categorias calculadas:', categoriasArray.length)
+      
       return {
         data: categoriasArray,
         total: total
       }
     } catch (error) {
-      console.error('Error al calcular gastos por categoría:', error)
+      console.error('[DASHBOARD] Error al calcular gastos por categoría:', error)
       return {
         data: [],
         total: 0
       }
     }
-  }
+  }, [])
 
-  // Función para cargar todos los datos del dashboard
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Cargar todos los datos en paralelo para mejor rendimiento
-      // Nota: Calculamos gastos por categoría desde todos los gastos para mostrar TODAS las categorías
-      const [resumenData, gastosRecientesData, gastosPorCategoriaData, comparativaData, alertasData] = await Promise.all([
-        dashboardService.getResumenMesActual(),
-        dashboardService.getGastosRecientes(),
-        calcularGastosPorCategoria(mesActual), // Usar función que calcula todas las categorías
-        dashboardService.getComparativaMensual(),
-        dashboardService.getAlertasFinancieras(),
-      ])
-
-      setResumen(resumenData)
-      setGastosRecientes(gastosRecientesData)
-      setGastosPorCategoria(gastosPorCategoriaData)
-      setComparativa(comparativaData)
-      setAlertas(alertasData)
-    } catch (error: any) {
-      console.error('Error al cargar datos del dashboard:', error)
-      setError(error.error || error.message || 'Error al cargar el dashboard. Por favor, intenta de nuevo.')
-    } finally {
-      setLoading(false)
+  // Verificar autenticación al cargar
+  useEffect(() => {
+    const isAuthenticated = getAuth()
+    if (!isAuthenticated) {
+      router.push('/login')
+      return
     }
-  }
+  }, [router])
+
+  // Recargar datos cuando cambia la cartera activa o cuando se carga por primera vez
+  useEffect(() => {
+    const isAuthenticated = getAuth()
+    if (!isAuthenticated) {
+      return
+    }
+    
+    console.log('[DASHBOARD] ==========================================')
+    console.log('[DASHBOARD] useEffect ejecutado - carteraActivaId:', carteraActivaId, 'tipo:', typeof carteraActivaId)
+    
+    // IMPORTANTE: Si carteraActivaId es null, no enviar undefined, enviar null explícitamente
+    // Esto permite al backend distinguir entre "sin cartera" (null) y "todas las carteras" (undefined)
+    // Pero según la documentación, si no hay carteraId, el backend debe filtrar por carteraId = null
+    // Por ahora, si no hay cartera activa, no enviamos el parámetro (undefined)
+    const carteraId = carteraActivaId || undefined
+    
+    console.log('[DASHBOARD] carteraId que se enviará al backend:', carteraId)
+    console.log('[DASHBOARD] URLs que se llamarán:', {
+      resumen: API_CONFIG.ENDPOINTS.DASHBOARD.RESUMEN(carteraId),
+      gastosRecientes: API_CONFIG.ENDPOINTS.DASHBOARD.GASTOS_RECIENTES(carteraId),
+      comparativa: API_CONFIG.ENDPOINTS.DASHBOARD.COMPARATIVA(carteraId),
+      alertas: API_CONFIG.ENDPOINTS.DASHBOARD.ALERTAS(carteraId),
+    })
+    
+    // LIMPIAR ESTADOS PRIMERO para evitar mostrar datos de la cartera anterior
+    console.log('[DASHBOARD] Limpiando estados anteriores...')
+    setResumen(null)
+    setGastosRecientes([])
+    setGastosPorCategoria(null)
+    setComparativa(null)
+    setAlertas([])
+    
+    // Usar un flag para evitar race conditions
+    let cancelled = false
+    
+    const reloadData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        console.log('[DASHBOARD] Iniciando carga de datos con carteraId:', carteraId)
+
+        // Cargar todos los datos en paralelo
+        const [resumenData, gastosRecientesData, gastosPorCategoriaData, comparativaData, alertasData] = await Promise.all([
+          dashboardService.getResumenMesActual(carteraId),
+          dashboardService.getGastosRecientes(carteraId),
+          calcularGastosPorCategoria(mesActual, carteraId),
+          dashboardService.getComparativaMensual(carteraId),
+          dashboardService.getAlertasFinancieras(carteraId),
+        ])
+
+        // Verificar si el efecto fue cancelado (cartera cambió durante la carga)
+        if (cancelled) {
+          console.log('[DASHBOARD] Carga cancelada - cartera cambió durante la carga')
+          return
+        }
+
+        console.log('[DASHBOARD] ==========================================')
+        console.log('[DASHBOARD] Datos recibidos del backend para carteraId:', carteraId)
+        console.log('[DASHBOARD] Resumen:', {
+          ingresos: resumenData.ingresos,
+          gastos: resumenData.gastos,
+          balance: resumenData.balance,
+          porcentajeGastado: resumenData.porcentajeGastado
+        })
+        console.log('[DASHBOARD] Gastos recientes:', gastosRecientesData.length)
+        console.log('[DASHBOARD] Categorías:', gastosPorCategoriaData.data.length, 'Total:', gastosPorCategoriaData.total)
+        console.log('[DASHBOARD] Comparativa:', {
+          mesActual: comparativaData.mesActual,
+          mesAnterior: comparativaData.mesAnterior
+        })
+        console.log('[DASHBOARD] Alertas:', alertasData.length)
+        console.log('[DASHBOARD] ==========================================')
+
+        // Actualizar con nuevos datos
+        setResumen(resumenData)
+        setGastosRecientes(gastosRecientesData)
+        setGastosPorCategoria(gastosPorCategoriaData)
+        setComparativa(comparativaData)
+        setAlertas(alertasData)
+        
+        console.log('[DASHBOARD] Estados actualizados correctamente')
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error('[DASHBOARD] Error al cargar datos:', error)
+          setError(error.error || error.message || 'Error al cargar el dashboard. Por favor, intenta de nuevo.')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    
+    reloadData()
+    
+    // Cleanup: marcar como cancelado si el efecto se desmonta o cambia
+    return () => {
+      cancelled = true
+      console.log('[DASHBOARD] Cleanup: efecto cancelado')
+    }
+  }, [carteraActivaId, mesActual, calcularGastosPorCategoria])
 
   // Preparar datos para el pie chart
   const COLORS = [
@@ -210,7 +297,7 @@ export default function DashboardPage() {
         <div className="dashboard-container">
           <div className="dashboard-error">
             <p>❌ {error}</p>
-            <button onClick={loadDashboardData} className="btn btn-primary">
+            <button onClick={() => window.location.reload()} className="btn btn-primary">
               Reintentar
             </button>
           </div>

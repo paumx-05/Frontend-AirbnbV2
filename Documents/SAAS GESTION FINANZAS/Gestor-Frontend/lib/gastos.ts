@@ -50,10 +50,13 @@ export const categoriasGastos = [
 ]
 
 // Función para obtener todos los gastos de un mes desde el backend
-export async function getGastos(mes: string, userId?: string): Promise<Gasto[]> {
+// @param mes - Mes en formato español (ej: 'noviembre')
+// @param userId - ID del usuario (opcional, deprecated)
+// @param carteraId - ID de la cartera para filtrar (opcional)
+export async function getGastos(mes: string, userId?: string, carteraId?: string): Promise<Gasto[]> {
   try {
-    console.log('[LIB GASTOS] Obteniendo gastos para mes:', mes)
-    const { gastos } = await gastosService.getGastosByMes(mes)
+    console.log('[LIB GASTOS] Obteniendo gastos para mes:', mes, 'carteraId:', carteraId)
+    const { gastos } = await gastosService.getGastosByMes(mes, carteraId)
     console.log('[LIB GASTOS] Gastos recibidos del servicio:', gastos.length, gastos)
     const gastosAdaptados = gastos.map(adaptBackendGastoToLocal)
     console.log('[LIB GASTOS] Gastos adaptados:', gastosAdaptados.length, gastosAdaptados)
@@ -73,8 +76,8 @@ export function saveGastos(mes: string, gastos: Gasto[], userId?: string): void 
 }
 
 // Función para agregar un nuevo gasto al backend
-// Ahora incluye soporte completo para gastos divididos
-export async function addGasto(mes: string, gasto: Omit<Gasto, 'id'>, userId?: string): Promise<void> {
+// Ahora incluye soporte completo para gastos divididos y carteras
+export async function addGasto(mes: string, gasto: Omit<Gasto, 'id'>, userId?: string, carteraId?: string): Promise<void> {
   try {
     // Convertir fecha a formato ISO si es necesario
     let fechaISO = gasto.fecha
@@ -92,14 +95,26 @@ export async function addGasto(mes: string, gasto: Omit<Gasto, 'id'>, userId?: s
       pagado: item.pagado ?? false, // Default false si no está definido
     }))
     
-    await gastosService.createGasto({
+    // Construir objeto de gasto, solo incluir carteraId si tiene valor
+    const gastoData: any = {
       descripcion: gasto.descripcion,
       monto: gasto.monto,
       fecha: fechaISO,
       categoria: gasto.categoria,
       mes: gasto.mes || mes,
-      dividido: dividido, // Enviar el array de división si existe
-    })
+    }
+    
+    // Solo incluir carteraId si tiene un valor válido
+    if (carteraId) {
+      gastoData.carteraId = carteraId
+    }
+    
+    // Solo incluir dividido si tiene elementos
+    if (dividido && dividido.length > 0) {
+      gastoData.dividido = dividido
+    }
+    
+    await gastosService.createGasto(gastoData)
   } catch (error: any) {
     console.error('Error al crear gasto:', error)
     throw error
@@ -117,9 +132,12 @@ export async function deleteGasto(mes: string, id: string, userId?: string): Pro
 }
 
 // Función para obtener el total de gastos de un mes desde el backend
-export async function getTotalGastos(mes: string, userId?: string): Promise<number> {
+// @param mes - Mes en formato español (ej: 'noviembre')
+// @param userId - ID del usuario (opcional, deprecated)
+// @param carteraId - ID de la cartera para filtrar (opcional)
+export async function getTotalGastos(mes: string, userId?: string, carteraId?: string): Promise<number> {
   try {
-    return await gastosService.getTotalByMes(mes)
+    return await gastosService.getTotalByMes(mes, carteraId)
   } catch (error) {
     console.error('Error al obtener total de gastos:', error)
     return 0
@@ -127,9 +145,13 @@ export async function getTotalGastos(mes: string, userId?: string): Promise<numb
 }
 
 // Función para obtener gastos por categoría desde el backend
-export async function getGastosPorCategoria(mes: string, categoria: string, userId?: string): Promise<Gasto[]> {
+// @param mes - Mes en formato español (ej: 'noviembre')
+// @param categoria - Nombre de la categoría
+// @param userId - ID del usuario (opcional, deprecated)
+// @param carteraId - ID de la cartera para filtrar (opcional)
+export async function getGastosPorCategoria(mes: string, categoria: string, userId?: string, carteraId?: string): Promise<Gasto[]> {
   try {
-    const { gastos } = await gastosService.getGastosByCategoria(mes, categoria)
+    const { gastos } = await gastosService.getGastosByCategoria(mes, categoria, carteraId)
     return gastos.map(adaptBackendGastoToLocal)
   } catch (error) {
     console.error('Error al obtener gastos por categoría:', error)
@@ -138,9 +160,13 @@ export async function getGastosPorCategoria(mes: string, categoria: string, user
 }
 
 // Función para obtener el total de gastos por categoría
-export async function getTotalPorCategoria(mes: string, categoria: string, userId?: string): Promise<number> {
+// @param mes - Mes en formato español (ej: 'noviembre')
+// @param categoria - Nombre de la categoría
+// @param userId - ID del usuario (opcional, deprecated)
+// @param carteraId - ID de la cartera para filtrar (opcional)
+export async function getTotalPorCategoria(mes: string, categoria: string, userId?: string, carteraId?: string): Promise<number> {
   try {
-    const { total } = await gastosService.getGastosByCategoria(mes, categoria)
+    const { total } = await gastosService.getGastosByCategoria(mes, categoria, carteraId)
     return total
   } catch (error) {
     console.error('Error al obtener total por categoría:', error)
@@ -149,9 +175,12 @@ export async function getTotalPorCategoria(mes: string, categoria: string, userI
 }
 
 // Función para obtener resumen por categorías desde el backend
-export async function getResumenPorCategorias(mes: string, userId?: string): Promise<{ [categoria: string]: number }> {
+// @param mes - Mes en formato español (ej: 'noviembre')
+// @param userId - ID del usuario (opcional, deprecated)
+// @param carteraId - ID de la cartera para filtrar (opcional)
+export async function getResumenPorCategorias(mes: string, userId?: string, carteraId?: string): Promise<{ [categoria: string]: number }> {
   try {
-    const gastos = await getGastos(mes, userId)
+    const gastos = await getGastos(mes, userId, carteraId)
     const resumen: { [categoria: string]: number } = {}
     
     gastos.forEach(gasto => {
@@ -176,6 +205,7 @@ export async function updateGasto(gastoId: string, updates: {
   fecha?: string
   categoria?: string
   mes?: string
+  carteraId?: string
   dividido?: Array<{
     amigoId: string
     amigoNombre: string

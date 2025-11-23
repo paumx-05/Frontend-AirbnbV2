@@ -12,6 +12,7 @@ import { getGastos, addGasto, deleteGasto, getTotalGastos, updateGasto, type Gas
 import { getNombresCategoriasPorTipo } from '@/lib/categorias'
 import { getPresupuestos } from '@/lib/presupuestos'
 import { getAmigos } from '@/lib/amigos'
+import { useCartera } from '@/hooks/useCartera'
 
 // Mapeo de valores de mes a nombres completos
 const mesesNombres: { [key: string]: string } = {
@@ -34,6 +35,7 @@ export default function GastosMesPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const mes = params?.mes as string
+  const { carteraActivaId } = useCartera()
 
   // Estados del formulario
   const [descripcion, setDescripcion] = useState('')
@@ -78,7 +80,7 @@ export default function GastosMesPage() {
     const usuarioActual = getUsuarioActual()
     if (usuarioActual && mes) {
       try {
-        const presupuestosData = await getPresupuestos(mes, usuarioActual.id)
+        const presupuestosData = await getPresupuestos(mes, usuarioActual.id, false, carteraActivaId || undefined)
         // Convertir a formato simple para búsqueda rápida
         const presupuestosMap = presupuestosData.map(p => ({
           categoria: p.categoria,
@@ -92,7 +94,7 @@ export default function GastosMesPage() {
     }
   }
 
-  // Cargar gastos y categorías al montar el componente o cambiar el mes
+  // Cargar gastos y categorías al montar el componente o cambiar el mes o la cartera
   useEffect(() => {
     if (mes) {
       loadGastos()
@@ -101,7 +103,7 @@ export default function GastosMesPage() {
       // loadAmigos es async, se ejecuta en paralelo
       loadAmigos().catch(err => console.error('Error al cargar amigos:', err))
     }
-  }, [mes, searchParams])
+  }, [mes, searchParams, carteraActivaId])
   
   // Función para cargar amigos desde el backend
   // Solo se cargan amigos activos (amistad mutua) para dividir gastos
@@ -177,12 +179,12 @@ export default function GastosMesPage() {
       return
     }
     
-    console.log('[PAGE GASTOS] Cargando gastos para mes:', mes)
+    console.log('[PAGE GASTOS] Cargando gastos para mes:', mes, 'carteraId:', carteraActivaId)
     setLoadingGastos(true)
     setErrorGastos(null)
     
     try {
-      const gastosMes = await getGastos(mes, usuarioActual.id)
+      const gastosMes = await getGastos(mes, usuarioActual.id, carteraActivaId || undefined)
       console.log('[PAGE GASTOS] Gastos recibidos:', gastosMes.length, gastosMes)
       
       // Ordenar gastos por fecha ascendente (más antiguos primero, más recientes abajo)
@@ -194,7 +196,7 @@ export default function GastosMesPage() {
       })
       console.log('[PAGE GASTOS] Gastos ordenados:', gastosOrdenados.length, gastosOrdenados)
       
-      const totalMes = await getTotalGastos(mes, usuarioActual.id)
+      const totalMes = await getTotalGastos(mes, usuarioActual.id, carteraActivaId || undefined)
       console.log('[PAGE GASTOS] Total del mes:', totalMes)
       
       setGastos(gastosOrdenados)
@@ -323,14 +325,20 @@ export default function GastosMesPage() {
           })
         } else {
           // Modo creación: crear nuevo gasto
-          await addGasto(mes, {
-            descripcion: descripcion.trim(),
-            monto: montoUsuario, // Solo la parte del usuario
-            fecha: fecha,
-            mes: mes,
-            categoria: categoria || 'Otros',
-            dividido: informacionDividida
-          }, usuarioActual.id)
+          // Solo pasar carteraId si tiene un valor válido
+          await addGasto(
+            mes, 
+            {
+              descripcion: descripcion.trim(),
+              monto: montoUsuario, // Solo la parte del usuario
+              fecha: fecha,
+              mes: mes,
+              categoria: categoria || 'Otros',
+              dividido: informacionDividida
+            }, 
+            usuarioActual.id, 
+            carteraActivaId || undefined
+          )
         }
 
         // Limpiar formulario

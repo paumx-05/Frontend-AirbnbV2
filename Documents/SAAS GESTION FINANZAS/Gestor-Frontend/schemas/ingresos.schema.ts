@@ -31,6 +31,7 @@ export const MesValidoSchema = z.enum([
 export const IngresoSchema = z.object({
   _id: z.string(),
   userId: z.string(),
+  carteraId: z.string().nullable().optional(), // ID de la cartera (opcional/nullable para retrocompatibilidad)
   descripcion: z.string(),
   monto: z.number().positive(),
   fecha: z.string(), // ISO date string
@@ -49,6 +50,7 @@ export const CreateIngresoRequestSchema = z.object({
   ]),
   categoria: z.string().min(1, 'La categoría es requerida'),
   mes: MesValidoSchema,
+  carteraId: z.string().optional(), // Opcional: ID de la cartera
 })
 
 // Schema para request de actualizar ingreso (todos opcionales)
@@ -61,6 +63,7 @@ export const UpdateIngresoRequestSchema = z.object({
   ]),
   categoria: z.string().min(1).optional(),
   mes: MesValidoSchema.optional(),
+  carteraId: z.string().optional(), // Opcional: ID de la cartera
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'Debe proporcionar al menos un campo para actualizar' }

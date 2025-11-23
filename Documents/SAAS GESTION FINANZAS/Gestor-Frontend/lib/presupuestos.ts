@@ -44,12 +44,16 @@ function adaptPresupuesto(backendPresupuesto: any): Presupuesto {
 }
 
 // Función para obtener presupuestos de un mes (async - ahora usa API real)
-export async function getPresupuestos(mes: string, userId?: string, forceRefresh: boolean = false): Promise<Presupuesto[]> {
+// @param mes - Mes en formato español (ej: 'noviembre')
+// @param userId - ID del usuario (opcional, deprecated)
+// @param forceRefresh - Forzar recarga sin usar cache
+// @param carteraId - ID de la cartera para filtrar (opcional)
+export async function getPresupuestos(mes: string, userId?: string, forceRefresh: boolean = false, carteraId?: string): Promise<Presupuesto[]> {
   if (typeof window === 'undefined') return []
   
   try {
     const mesValido = validateMes(mes)
-    const cacheKey = `${mes}-${userId || 'default'}`
+    const cacheKey = `${mes}-${userId || 'default'}-${carteraId || 'default'}`
     
     // Si se fuerza la recarga, limpiar cache primero
     if (forceRefresh) {
@@ -63,7 +67,7 @@ export async function getPresupuestos(mes: string, userId?: string, forceRefresh
     }
     
     // Llamar al servicio real
-    const backendPresupuestos = await presupuestosService.getPresupuestosByMes(mesValido)
+    const backendPresupuestos = await presupuestosService.getPresupuestosByMes(mesValido, carteraId)
     const presupuestos = backendPresupuestos.map(adaptPresupuesto)
     
     // Actualizar cache
@@ -88,7 +92,8 @@ export async function setPresupuesto(
   categoria: string, 
   monto: number, 
   totalIngresos: number, 
-  userId?: string
+  userId?: string,
+  carteraId?: string
 ): Promise<void> {
   if (typeof window === 'undefined') return
   
@@ -100,11 +105,12 @@ export async function setPresupuesto(
       mes: mesValido,
       categoria,
       monto,
-      totalIngresos
+      totalIngresos,
+      carteraId: carteraId // Incluir carteraId si se proporciona
     })
     
     // Limpiar cache para forzar recarga
-    const cacheKey = `${mes}-${userId || 'default'}`
+    const cacheKey = `${mes}-${userId || 'default'}-${carteraId || 'default'}`
     presupuestosCache.delete(cacheKey)
     totalCache.delete(cacheKey)
   } catch (error) {

@@ -11,6 +11,7 @@ import { getAuth, getUsuarioActual } from '@/lib/auth'
 import { ingresosService } from '@/services/ingresos.service'
 import type { Ingreso, MesValido } from '@/models/ingresos'
 import { getNombresCategoriasPorTipo } from '@/lib/categorias'
+import { useCartera } from '@/hooks/useCartera'
 
 // Mapeo de valores de mes a nombres completos
 const mesesNombres: { [key: string]: string } = {
@@ -33,6 +34,7 @@ export default function IngresosMesPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const mes = params?.mes as string
+  const { carteraActivaId } = useCartera()
 
   // Estados del formulario
   const [descripcion, setDescripcion] = useState('')
@@ -58,13 +60,13 @@ export default function IngresosMesPage() {
     }
   }, [router])
 
-  // Cargar ingresos y categorías al montar el componente o cambiar el mes
+  // Cargar ingresos y categorías al montar el componente o cambiar el mes o la cartera
   useEffect(() => {
     if (mes) {
       loadIngresos()
       loadCategorias()
     }
-  }, [mes, searchParams])
+  }, [mes, searchParams, carteraActivaId])
 
   // Función para cargar categorías desde el backend
   const loadCategorias = async () => {
@@ -118,8 +120,8 @@ export default function IngresosMesPage() {
       setError(null)
       
       const [ingresosData, totalData] = await Promise.all([
-        ingresosService.getIngresosByMes(mes as MesValido),
-        ingresosService.getTotalByMes(mes as MesValido)
+        ingresosService.getIngresosByMes(mes as MesValido, carteraActivaId || undefined),
+        ingresosService.getTotalByMes(mes as MesValido, carteraActivaId || undefined)
       ])
       
       setIngresos(ingresosData)
@@ -159,13 +161,21 @@ export default function IngresosMesPage() {
       // Convertir fecha a Date object si es string
       const fechaDate = fecha ? new Date(fecha) : new Date()
       
-      await ingresosService.createIngreso({
+      // Construir objeto de ingreso, solo incluir carteraId si tiene valor
+      const ingresoData: any = {
         descripcion: descripcion.trim(),
         monto: parseFloat(monto),
         fecha: fechaDate,
         categoria: categoria || 'Otros',
-        mes: mes as MesValido
-      })
+        mes: mes as MesValido,
+      }
+      
+      // Solo incluir carteraId si tiene un valor válido
+      if (carteraActivaId) {
+        ingresoData.carteraId = carteraActivaId
+      }
+      
+      await ingresosService.createIngreso(ingresoData)
 
       // Limpiar formulario
       setDescripcion('')

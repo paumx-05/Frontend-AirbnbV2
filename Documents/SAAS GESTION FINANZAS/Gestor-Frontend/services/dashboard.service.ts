@@ -151,40 +151,51 @@ async function fetchAPI<T>(
 export const dashboardService = {
   /**
    * Obtiene el resumen del mes actual
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getResumenMesActual(): Promise<ResumenMesActual> {
+  async getResumenMesActual(carteraId?: string): Promise<ResumenMesActual> {
+    const endpoint = API_CONFIG.ENDPOINTS.DASHBOARD.RESUMEN(carteraId)
+    console.log('[DASHBOARD SERVICE] getResumenMesActual - endpoint:', endpoint, 'carteraId:', carteraId)
+    
     const response = await fetchAPI(
-      API_CONFIG.ENDPOINTS.DASHBOARD.RESUMEN,
+      endpoint,
       {
         method: 'GET',
       },
       ResumenResponseSchema
     )
     
+    console.log('[DASHBOARD SERVICE] getResumenMesActual - respuesta:', response.data)
     return response.data
   },
 
   /**
    * Obtiene los últimos 7 gastos del mes actual
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getGastosRecientes(): Promise<GastoReciente[]> {
+  async getGastosRecientes(carteraId?: string): Promise<GastoReciente[]> {
+    const endpoint = API_CONFIG.ENDPOINTS.DASHBOARD.GASTOS_RECIENTES(carteraId)
+    console.log('[DASHBOARD SERVICE] getGastosRecientes - endpoint:', endpoint, 'carteraId:', carteraId)
+    
     const response = await fetchAPI(
-      API_CONFIG.ENDPOINTS.DASHBOARD.GASTOS_RECIENTES,
+      endpoint,
       {
         method: 'GET',
       },
       GastosRecientesResponseSchema
     )
     
+    console.log('[DASHBOARD SERVICE] getGastosRecientes - cantidad:', response.data?.length || 0)
     return response.data
   },
 
   /**
    * Obtiene las top 3 categorías con más gastos del mes actual
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getGastosPorCategoria(): Promise<GastosPorCategoriaResponse> {
+  async getGastosPorCategoria(carteraId?: string): Promise<GastosPorCategoriaResponse> {
     const response = await fetchAPI(
-      API_CONFIG.ENDPOINTS.DASHBOARD.GASTOS_CATEGORIA,
+      API_CONFIG.ENDPOINTS.DASHBOARD.GASTOS_CATEGORIA(carteraId),
       {
         method: 'GET',
       },
@@ -199,25 +210,31 @@ export const dashboardService = {
 
   /**
    * Obtiene la comparativa mensual (mes actual vs mes anterior)
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getComparativaMensual(): Promise<ComparativaMensual> {
+  async getComparativaMensual(carteraId?: string): Promise<ComparativaMensual> {
+    const endpoint = API_CONFIG.ENDPOINTS.DASHBOARD.COMPARATIVA(carteraId)
+    console.log('[DASHBOARD SERVICE] getComparativaMensual - endpoint:', endpoint, 'carteraId:', carteraId)
+    
     const response = await fetchAPI(
-      API_CONFIG.ENDPOINTS.DASHBOARD.COMPARATIVA,
+      endpoint,
       {
         method: 'GET',
       },
       ComparativaResponseSchema
     )
     
+    console.log('[DASHBOARD SERVICE] getComparativaMensual - respuesta:', response.data)
     return response.data
   },
 
   /**
    * Obtiene las alertas financieras del mes actual
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getAlertasFinancieras(): Promise<AlertaFinanciera[]> {
+  async getAlertasFinancieras(carteraId?: string): Promise<AlertaFinanciera[]> {
     const response = await fetchAPI(
-      API_CONFIG.ENDPOINTS.DASHBOARD.ALERTAS,
+      API_CONFIG.ENDPOINTS.DASHBOARD.ALERTAS(carteraId),
       {
         method: 'GET',
       },

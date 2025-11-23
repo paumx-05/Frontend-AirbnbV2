@@ -179,10 +179,12 @@ async function fetchAPI<T>(
 export const ingresosService = {
   /**
    * Obtiene todos los ingresos de un mes específico
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getIngresosByMes(mes: MesValido): Promise<Ingreso[]> {
+  async getIngresosByMes(mes: MesValido, carteraId?: string): Promise<Ingreso[]> {
     const response = await fetchAPI<BackendIngresosResponse>(
-      API_CONFIG.ENDPOINTS.INGRESOS.GET_BY_MES(mes),
+      API_CONFIG.ENDPOINTS.INGRESOS.GET_BY_MES(mes, carteraId),
       {
         method: 'GET',
       },
@@ -205,11 +207,19 @@ export const ingresosService = {
    */
   async createIngreso(ingresoData: CreateIngresoRequest): Promise<Ingreso> {
     // Normalizar fecha a ISO string si es Date
-    const normalizedData = {
-      ...ingresoData,
+    const normalizedData: any = {
+      descripcion: ingresoData.descripcion,
+      monto: ingresoData.monto,
       fecha: ingresoData.fecha instanceof Date 
         ? ingresoData.fecha.toISOString() 
-        : ingresoData.fecha
+        : ingresoData.fecha,
+      categoria: ingresoData.categoria,
+      mes: ingresoData.mes,
+    }
+    
+    // Solo incluir carteraId si tiene un valor válido (no null, no undefined)
+    if (ingresoData.carteraId) {
+      normalizedData.carteraId = ingresoData.carteraId
     }
     
     // Validar request
@@ -221,19 +231,34 @@ export const ingresosService = {
       } as IngresoError
     }
     
-    console.log('[INGRESOS SERVICE] Creando ingreso:', {
+    // Limpiar el objeto validado: eliminar campos undefined antes de serializar
+    const cleanData: any = {
       descripcion: validated.data.descripcion,
       monto: validated.data.monto,
       fecha: validated.data.fecha,
       categoria: validated.data.categoria,
       mes: validated.data.mes,
+    }
+    
+    // Solo incluir carteraId si tiene un valor válido (no undefined, no null, no string vacío)
+    if (validated.data.carteraId) {
+      cleanData.carteraId = validated.data.carteraId
+    }
+    
+    console.log('[INGRESOS SERVICE] Creando ingreso:', {
+      descripcion: cleanData.descripcion,
+      monto: cleanData.monto,
+      fecha: cleanData.fecha,
+      categoria: cleanData.categoria,
+      mes: cleanData.mes,
+      carteraId: cleanData.carteraId || 'no incluido',
     })
     
     const response = await fetchAPI<BackendIngresoResponse>(
       API_CONFIG.ENDPOINTS.INGRESOS.CREATE,
       {
         method: 'POST',
-        body: JSON.stringify(validated.data),
+        body: JSON.stringify(cleanData),
       },
       IngresoResponseSchema
     )
@@ -297,10 +322,12 @@ export const ingresosService = {
 
   /**
    * Obtiene el total de ingresos de un mes
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getTotalByMes(mes: MesValido): Promise<number> {
+  async getTotalByMes(mes: MesValido, carteraId?: string): Promise<number> {
     const response = await fetchAPI<BackendTotalIngresosResponse>(
-      API_CONFIG.ENDPOINTS.INGRESOS.GET_TOTAL(mes),
+      API_CONFIG.ENDPOINTS.INGRESOS.GET_TOTAL(mes, carteraId),
       {
         method: 'GET',
       },
@@ -312,10 +339,13 @@ export const ingresosService = {
 
   /**
    * Obtiene ingresos filtrados por categoría en un mes
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param categoria - Nombre de la categoría
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getIngresosByCategoria(mes: MesValido, categoria: string): Promise<{ ingresos: Ingreso[]; total: number }> {
+  async getIngresosByCategoria(mes: MesValido, categoria: string, carteraId?: string): Promise<{ ingresos: Ingreso[]; total: number }> {
     const response = await fetchAPI<BackendIngresosByCategoriaResponse>(
-      API_CONFIG.ENDPOINTS.INGRESOS.GET_BY_CATEGORIA(mes, categoria),
+      API_CONFIG.ENDPOINTS.INGRESOS.GET_BY_CATEGORIA(mes, categoria, carteraId),
       {
         method: 'GET',
       },

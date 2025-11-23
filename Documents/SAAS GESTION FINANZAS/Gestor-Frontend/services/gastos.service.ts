@@ -176,10 +176,12 @@ async function fetchAPI<T>(
 export const gastosService = {
   /**
    * Obtiene todos los gastos de un mes específico
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getGastosByMes(mes: string): Promise<{ gastos: Gasto[]; total: number }> {
+  async getGastosByMes(mes: string, carteraId?: string): Promise<{ gastos: Gasto[]; total: number }> {
     const response = await fetchAPI<BackendGastosResponse>(
-      API_CONFIG.ENDPOINTS.GASTOS.GET_BY_MES(mes),
+      API_CONFIG.ENDPOINTS.GASTOS.GET_BY_MES(mes, carteraId),
       {
         method: 'GET',
       },
@@ -213,8 +215,31 @@ export const gastosService = {
    * Crea un nuevo gasto
    */
   async createGasto(gastoData: CreateGastoRequest): Promise<Gasto> {
-    // Validar request
-    const validated = CreateGastoRequestSchema.safeParse(gastoData)
+    // Construir objeto limpio ANTES de validar, solo incluir campos con valor válido
+    const cleanData: any = {
+      descripcion: gastoData.descripcion,
+      monto: gastoData.monto,
+      fecha: gastoData.fecha,
+      categoria: gastoData.categoria,
+    }
+    
+    // Solo incluir mes si tiene valor
+    if (gastoData.mes) {
+      cleanData.mes = gastoData.mes
+    }
+    
+    // IMPORTANTE: Solo incluir carteraId si tiene un valor válido (no null, no undefined, no string vacío)
+    if (gastoData.carteraId && gastoData.carteraId.trim() !== '') {
+      cleanData.carteraId = gastoData.carteraId
+    }
+    
+    // Solo incluir dividido si tiene elementos
+    if (gastoData.dividido && gastoData.dividido.length > 0) {
+      cleanData.dividido = gastoData.dividido
+    }
+    
+    // Validar request después de limpiar
+    const validated = CreateGastoRequestSchema.safeParse(cleanData)
     if (!validated.success) {
       throw {
         message: validated.error.issues[0].message,
@@ -222,20 +247,42 @@ export const gastosService = {
       } as GastoError
     }
     
-    console.log('[GASTOS SERVICE] Creando gasto:', {
+    // Asegurar que el objeto final no tenga campos undefined
+    const finalData: any = {
       descripcion: validated.data.descripcion,
       monto: validated.data.monto,
       fecha: validated.data.fecha,
       categoria: validated.data.categoria,
-      mes: validated.data.mes,
-      dividido: validated.data.dividido
+    }
+    
+    if (validated.data.mes) {
+      finalData.mes = validated.data.mes
+    }
+    
+    // Solo incluir carteraId si está presente y tiene valor válido
+    if (validated.data.carteraId && validated.data.carteraId.trim() !== '') {
+      finalData.carteraId = validated.data.carteraId
+    }
+    
+    if (validated.data.dividido && validated.data.dividido.length > 0) {
+      finalData.dividido = validated.data.dividido
+    }
+    
+    console.log('[GASTOS SERVICE] Creando gasto:', {
+      descripcion: finalData.descripcion,
+      monto: finalData.monto,
+      fecha: finalData.fecha,
+      categoria: finalData.categoria,
+      mes: finalData.mes || 'no incluido',
+      carteraId: finalData.carteraId || 'no incluido',
+      dividido: finalData.dividido ? `${finalData.dividido.length} elementos` : 'no incluido'
     })
     
     const response = await fetchAPI<BackendGastoResponse>(
       API_CONFIG.ENDPOINTS.GASTOS.CREATE,
       {
         method: 'POST',
-        body: JSON.stringify(validated.data),
+        body: JSON.stringify(finalData),
       },
       GastoResponseSchema
     )
@@ -243,7 +290,8 @@ export const gastosService = {
     console.log('[GASTOS SERVICE] Gasto creado exitosamente:', {
       id: response.data._id,
       userId: response.data.userId,
-      descripcion: response.data.descripcion
+      descripcion: response.data.descripcion,
+      carteraId: response.data.carteraId || 'sin cartera'
     })
     
     return response.data
@@ -289,10 +337,12 @@ export const gastosService = {
 
   /**
    * Obtiene el total de gastos de un mes
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getTotalByMes(mes: string): Promise<number> {
+  async getTotalByMes(mes: string, carteraId?: string): Promise<number> {
     const response = await fetchAPI<BackendTotalGastosResponse>(
-      API_CONFIG.ENDPOINTS.GASTOS.GET_TOTAL(mes),
+      API_CONFIG.ENDPOINTS.GASTOS.GET_TOTAL(mes, carteraId),
       {
         method: 'GET',
       },
@@ -304,10 +354,13 @@ export const gastosService = {
 
   /**
    * Obtiene gastos filtrados por categoría en un mes
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param categoria - Nombre de la categoría
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getGastosByCategoria(mes: string, categoria: string): Promise<{ gastos: Gasto[]; total: number }> {
+  async getGastosByCategoria(mes: string, categoria: string, carteraId?: string): Promise<{ gastos: Gasto[]; total: number }> {
     const response = await fetchAPI<BackendGastosResponse>(
-      API_CONFIG.ENDPOINTS.GASTOS.GET_BY_CATEGORIA(mes, categoria),
+      API_CONFIG.ENDPOINTS.GASTOS.GET_BY_CATEGORIA(mes, categoria, carteraId),
       {
         method: 'GET',
       },

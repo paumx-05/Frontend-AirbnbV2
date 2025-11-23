@@ -5,6 +5,7 @@
 export interface Gasto {
   _id: string
   userId: string
+  carteraId?: string | null // ID de la cartera (opcional/nullable para retrocompatibilidad)
   descripcion: string
   monto: number
   fecha: string // ISO date string
@@ -26,6 +27,7 @@ export interface CreateGastoRequest {
   fecha: string // ISO date string o formato "YYYY-MM-DD"
   categoria: string
   mes?: string // Opcional: se extrae de la fecha si no se proporciona
+  carteraId?: string // Opcional: ID de la cartera
   dividido?: Array<{
     amigoId: string
     amigoNombre: string
@@ -41,6 +43,7 @@ export interface UpdateGastoRequest {
   fecha?: string
   categoria?: string
   mes?: string
+  carteraId?: string // Opcional: ID de la cartera
   dividido?: Array<{
     amigoId: string
     amigoNombre: string

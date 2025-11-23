@@ -180,10 +180,12 @@ async function fetchAPI<T>(
 export const presupuestosService = {
   /**
    * Obtiene todos los presupuestos de un mes específico
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getPresupuestosByMes(mes: MesValido): Promise<Presupuesto[]> {
+  async getPresupuestosByMes(mes: MesValido, carteraId?: string): Promise<Presupuesto[]> {
     const response = await fetchAPI<BackendPresupuestosResponse>(
-      API_CONFIG.ENDPOINTS.PRESUPUESTOS.GET_BY_MES(mes),
+      API_CONFIG.ENDPOINTS.PRESUPUESTOS.GET_BY_MES(mes, carteraId),
       {
         method: 'GET',
       },
@@ -285,10 +287,12 @@ export const presupuestosService = {
 
   /**
    * Obtiene el total presupuestado de un mes
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getTotalByMes(mes: MesValido): Promise<number> {
+  async getTotalByMes(mes: MesValido, carteraId?: string): Promise<number> {
     const response = await fetchAPI<BackendTotalPresupuestoResponse>(
-      API_CONFIG.ENDPOINTS.PRESUPUESTOS.GET_TOTAL(mes),
+      API_CONFIG.ENDPOINTS.PRESUPUESTOS.GET_TOTAL(mes, carteraId),
       {
         method: 'GET',
       },
@@ -297,6 +301,7 @@ export const presupuestosService = {
     
     console.log('[PRESUPUESTOS SERVICE] Total presupuestado:', {
       mes,
+      carteraId,
       total: response.data.total
     })
     
@@ -305,10 +310,12 @@ export const presupuestosService = {
 
   /**
    * Obtiene el resumen completo de presupuestos de un mes
+   * @param mes - Mes en formato español (ej: 'noviembre')
+   * @param carteraId - ID de la cartera para filtrar (opcional)
    */
-  async getResumenByMes(mes: MesValido): Promise<ResumenPresupuestos> {
+  async getResumenByMes(mes: MesValido, carteraId?: string): Promise<ResumenPresupuestos> {
     const response = await fetchAPI<BackendResumenPresupuestosResponse>(
-      API_CONFIG.ENDPOINTS.PRESUPUESTOS.GET_RESUMEN(mes),
+      API_CONFIG.ENDPOINTS.PRESUPUESTOS.GET_RESUMEN(mes, carteraId),
       {
         method: 'GET',
       },

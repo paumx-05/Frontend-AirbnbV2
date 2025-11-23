@@ -5,7 +5,9 @@
 'use client'
 
 import Sidebar from '@/components/Sidebar'
+import CarteraSelector from '@/components/CarteraSelector'
 import { ProtectedRoute } from '@/middleware/routeProtection'
+import { CarteraProvider } from '@/contexts/CarteraContext'
 
 export default function DashboardLayout({
   children,
@@ -14,12 +16,17 @@ export default function DashboardLayout({
 }) {
   return (
     <ProtectedRoute>
-      <div className="dashboard-layout">
-        <Sidebar />
-        <div className="dashboard-main-content">
-          {children}
+      <CarteraProvider>
+        <div className="dashboard-layout">
+          <Sidebar />
+          <div className="dashboard-main-content">
+            <div className="dashboard-header">
+              <CarteraSelector />
+            </div>
+            {children}
+          </div>
         </div>
-      </div>
+      </CarteraProvider>
     </ProtectedRoute>
   )
 }

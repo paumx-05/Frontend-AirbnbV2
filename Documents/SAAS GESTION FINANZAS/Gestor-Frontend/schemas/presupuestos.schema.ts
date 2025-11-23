@@ -33,6 +33,7 @@ export const MesValidoSchema = z.enum([
 export const PresupuestoSchema = z.object({
   _id: z.string(),
   userId: z.string(),
+  carteraId: z.string().nullable().optional(), // ID de la cartera (opcional/nullable para retrocompatibilidad)
   mes: MesValidoSchema,
   categoria: z.string().min(1, 'La categoría es requerida'),
   monto: z.number().min(0, 'El monto debe ser mayor o igual a 0'),
@@ -48,6 +49,7 @@ export const CreatePresupuestoRequestSchema = z.object({
   monto: z.number().min(0).optional(),
   porcentaje: z.number().min(0).max(100).optional(),
   totalIngresos: z.number().min(0.01, 'El total de ingresos debe ser mayor a 0'),
+  carteraId: z.string().optional(), // Opcional: ID de la cartera
 }).refine(
   (data) => data.monto !== undefined || data.porcentaje !== undefined,
   { message: 'Debe proporcionar al menos monto o porcentaje' }
@@ -58,6 +60,7 @@ export const UpdatePresupuestoRequestSchema = z.object({
   monto: z.number().min(0).optional(),
   porcentaje: z.number().min(0).max(100).optional(),
   totalIngresos: z.number().min(0.01).optional(),
+  carteraId: z.string().optional(), // Opcional: ID de la cartera
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'Debe proporcionar al menos un campo para actualizar' }

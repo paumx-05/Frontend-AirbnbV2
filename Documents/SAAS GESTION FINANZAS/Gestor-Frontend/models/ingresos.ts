@@ -19,6 +19,7 @@ export type MesValido =
 export interface Ingreso {
   _id: string
   userId: string
+  carteraId?: string | null // ID de la cartera (opcional/nullable para retrocompatibilidad)
   descripcion: string
   monto: number
   fecha: string // ISO date string
@@ -34,6 +35,7 @@ export interface CreateIngresoRequest {
   fecha: string | Date // ISO date string o Date object
   categoria: string
   mes: MesValido
+  carteraId?: string // Opcional: ID de la cartera
 }
 
 // Request para actualizar un ingreso (todos los campos opcionales)
@@ -43,6 +45,7 @@ export interface UpdateIngresoRequest {
   fecha?: string | Date
   categoria?: string
   mes?: MesValido
+  carteraId?: string // Opcional: ID de la cartera
 }
 
 // Respuesta del backend para obtener ingresos por mes

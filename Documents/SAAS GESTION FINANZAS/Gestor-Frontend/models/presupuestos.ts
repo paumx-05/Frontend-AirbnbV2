@@ -21,6 +21,7 @@ export type MesValido =
 export interface Presupuesto {
   _id: string
   userId: string
+  carteraId?: string | null // ID de la cartera (opcional/nullable para retrocompatibilidad)
   mes: MesValido
   categoria: string
   monto: number
@@ -36,6 +37,7 @@ export interface CreatePresupuestoRequest {
   monto?: number
   porcentaje?: number
   totalIngresos: number
+  carteraId?: string // Opcional: ID de la cartera
 }
 
 // Request para actualizar presupuesto existente (todos los campos opcionales)
@@ -43,6 +45,7 @@ export interface UpdatePresupuestoRequest {
   monto?: number
   porcentaje?: number
   totalIngresos?: number
+  carteraId?: string // Opcional: ID de la cartera
 }
 
 // Respuesta del backend para obtener presupuestos del mes
