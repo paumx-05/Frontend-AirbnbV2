@@ -11,6 +11,8 @@ import { Amigo } from '../models/Amigo.model';
 import { MensajeChat } from '../models/MensajeChat.model';
 import { Mensaje } from '../models/Mensaje.model';
 import { Notificacion } from '../models/Notificacion.model';
+import { Cartera } from '../models/Cartera.model';
+import { TransaccionCartera } from '../models/TransaccionCartera.model';
 
 dotenv.config();
 
@@ -78,6 +80,8 @@ const limpiarDB = async (): Promise<void> => {
     await MensajeChat.deleteMany({});
     await Mensaje.deleteMany({});
     await Notificacion.deleteMany({});
+    await Cartera.deleteMany({});
+    await TransaccionCartera.deleteMany({});
     console.log('✅ Base de datos limpiada exitosamente\n');
   } catch (error) {
     console.error('❌ Error al limpiar la base de datos:', error);
@@ -590,6 +594,125 @@ const crearNotificaciones = async (userId: mongoose.Types.ObjectId): Promise<voi
   }
 };
 
+// Crear carteras
+const crearCarteras = async (userId: mongoose.Types.ObjectId): Promise<mongoose.Types.ObjectId[]> => {
+  const confirmarCrear = await confirmar('💳 ¿Crear carteras?');
+  
+  if (!confirmarCrear) {
+    console.log('⏭️  Saltando creación de carteras\n');
+    return [];
+  }
+
+  try {
+    console.log('💳 Creando carteras...');
+    
+    const carteras = [
+      {
+        userId,
+        nombre: 'Cartera Personal',
+        descripcion: 'Cartera principal para gastos personales',
+        saldo: 1000.00,
+        saldoInicial: 1000.00,
+        moneda: 'EUR',
+        icono: '💳',
+        color: '#3b82f6',
+        activa: true
+      },
+      {
+        userId,
+        nombre: 'Cartera Ahorros',
+        descripcion: 'Cartera para ahorros a largo plazo',
+        saldo: 5000.00,
+        saldoInicial: 5000.00,
+        moneda: 'EUR',
+        icono: '💰',
+        color: '#10b981',
+        activa: true
+      },
+      {
+        userId,
+        nombre: 'Cartera Efectivo',
+        descripcion: 'Cartera para efectivo en mano',
+        saldo: 200.00,
+        saldoInicial: 200.00,
+        moneda: 'EUR',
+        icono: '💵',
+        color: '#f59e0b',
+        activa: true
+      }
+    ];
+    
+    const carterasCreadas = await Cartera.insertMany(carteras);
+    console.log(`✅ ${carterasCreadas.length} carteras creadas\n`);
+    return carterasCreadas.map(c => c._id);
+  } catch (error) {
+    console.error('❌ Error al crear carteras:', error);
+    throw error;
+  }
+};
+
+// Crear transacciones de cartera
+const crearTransaccionesCartera = async (userId: mongoose.Types.ObjectId, carteraIds: mongoose.Types.ObjectId[]): Promise<void> => {
+  const confirmarCrear = await confirmar('📝 ¿Crear transacciones de cartera?');
+  
+  if (!confirmarCrear) {
+    console.log('⏭️  Saltando creación de transacciones de cartera\n');
+    return;
+  }
+
+  if (carteraIds.length === 0) {
+    console.log('⚠️  No hay carteras creadas, saltando transacciones de cartera\n');
+    return;
+  }
+
+  try {
+    console.log('📝 Creando transacciones de cartera...');
+    
+    const fechaActual = new Date();
+    const transacciones = [
+      {
+        userId,
+        tipo: 'deposito' as const,
+        carteraDestinoId: carteraIds[0],
+        monto: 1000.00,
+        concepto: 'Depósito inicial',
+        fecha: new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1)
+      },
+      {
+        userId,
+        tipo: 'deposito' as const,
+        carteraDestinoId: carteraIds[1],
+        monto: 5000.00,
+        concepto: 'Ahorro inicial',
+        fecha: new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1)
+      },
+      {
+        userId,
+        tipo: 'retiro' as const,
+        carteraOrigenId: carteraIds[0],
+        monto: 200.00,
+        concepto: 'Retiro para efectivo',
+        fecha: new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 5)
+      },
+      {
+        userId,
+        tipo: 'transferencia' as const,
+        carteraOrigenId: carteraIds[0],
+        carteraDestinoId: carteraIds[1],
+        monto: 500.00,
+        concepto: 'Transferencia a ahorros',
+        fecha: new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 10)
+      }
+    ];
+    
+    const transaccionesCreadas = await TransaccionCartera.insertMany(transacciones);
+    console.log(`✅ ${transaccionesCreadas.length} transacciones de cartera creadas\n`);
+  } catch (error) {
+    console.error('❌ Error al crear transacciones de cartera:', error);
+    throw error;
+  }
+};
+
 // Función principal
 const ejecutarSeed = async (): Promise<void> => {
   try {
@@ -642,6 +765,12 @@ const ejecutarSeed = async (): Promise<void> => {
     // Crear notificaciones
     await crearNotificaciones(userId);
     
+    // Crear carteras
+    const carteraIds = await crearCarteras(userId);
+    
+    // Crear transacciones de cartera
+    await crearTransaccionesCartera(userId, carteraIds);
+    
     // Resumen final
     console.log('📊 Resumen del seed:');
     const counts = {
@@ -653,7 +782,9 @@ const ejecutarSeed = async (): Promise<void> => {
       amigos: await Amigo.countDocuments(),
       mensajesChat: await MensajeChat.countDocuments(),
       mensajes: await Mensaje.countDocuments(),
-      notificaciones: await Notificacion.countDocuments()
+      notificaciones: await Notificacion.countDocuments(),
+      carteras: await Cartera.countDocuments(),
+      transaccionesCartera: await TransaccionCartera.countDocuments()
     };
     
     console.log(`  - Usuarios: ${counts.usuarios}`);
@@ -665,6 +796,8 @@ const ejecutarSeed = async (): Promise<void> => {
     console.log(`  - Mensajes de Chat: ${counts.mensajesChat}`);
     console.log(`  - Mensajes: ${counts.mensajes}`);
     console.log(`  - Notificaciones: ${counts.notificaciones}`);
+    console.log(`  - Carteras: ${counts.carteras}`);
+    console.log(`  - Transacciones de Cartera: ${counts.transaccionesCartera}`);
     
     console.log('\n✅ Seed completado exitosamente!');
     
