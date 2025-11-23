@@ -75,6 +75,15 @@ export const TendenciasTemporalesSchema = z.object({
   datosGrafico: z.array(PuntoGraficoSchema),
 })
 
+// Schema para subcategoría con análisis
+export const SubcategoriaAnalisisSchema = z.object({
+  nombre: z.string(),
+  monto: z.number().min(0),
+  porcentaje: z.number().min(0).max(100),
+  cantidad: z.number().int().min(0),
+  promedio: z.number().min(0),
+})
+
 // Schema para categoría con análisis
 export const CategoriaAnalisisSchema = z.object({
   categoria: z.string(),
@@ -83,6 +92,7 @@ export const CategoriaAnalisisSchema = z.object({
   cantidad: z.number().int().min(0),
   promedio: z.number().min(0),
   tendencia: z.enum(['aumento', 'disminucion', 'estable']),
+  subcategorias: z.array(SubcategoriaAnalisisSchema).optional(), // Array de subcategorías con análisis (opcional)
 })
 
 // Schema para análisis por categorías

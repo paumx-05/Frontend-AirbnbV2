@@ -270,7 +270,25 @@ export const estadisticasService = {
       AnalisisCategoriasResponseSchema
     )
     
-    console.log('[ESTADISTICAS SERVICE] getAnalisisCategorias - respuesta:', response.data)
+    console.log('[ESTADISTICAS SERVICE] getAnalisisCategorias - respuesta completa:', JSON.stringify(response.data, null, 2))
+    
+    // Log detallado de subcategorías
+    if (response.data.categoriasGastos) {
+      response.data.categoriasGastos.forEach((cat, index) => {
+        console.log(`[ESTADISTICAS SERVICE] Categoría ${index + 1}:`, {
+          nombre: cat.categoria,
+          monto: cat.monto,
+          tieneSubcategorias: !!cat.subcategorias,
+          cantidadSubcategorias: cat.subcategorias?.length || 0,
+          subcategorias: cat.subcategorias?.map(sub => ({
+            nombre: sub.nombre,
+            monto: sub.monto,
+            porcentaje: sub.porcentaje
+          }))
+        })
+      })
+    }
+    
     return response.data
   },
 

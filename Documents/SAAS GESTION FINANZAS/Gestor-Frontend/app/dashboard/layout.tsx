@@ -8,6 +8,7 @@ import Sidebar from '@/components/Sidebar'
 import CarteraSelector from '@/components/CarteraSelector'
 import { ProtectedRoute } from '@/middleware/routeProtection'
 import { CarteraProvider } from '@/contexts/CarteraContext'
+import { ConfiguracionProvider } from '@/contexts/ConfiguracionContext'
 
 export default function DashboardLayout({
   children,
@@ -16,17 +17,19 @@ export default function DashboardLayout({
 }) {
   return (
     <ProtectedRoute>
-      <CarteraProvider>
-        <div className="dashboard-layout">
-          <Sidebar />
-          <div className="dashboard-main-content">
-            <div className="dashboard-header">
-              <CarteraSelector />
+      <ConfiguracionProvider>
+        <CarteraProvider>
+          <div className="dashboard-layout">
+            <Sidebar />
+            <div className="dashboard-main-content">
+              <div className="dashboard-header">
+                <CarteraSelector />
+              </div>
+              {children}
             </div>
-            {children}
           </div>
-        </div>
-      </CarteraProvider>
+        </CarteraProvider>
+      </ConfiguracionProvider>
     </ProtectedRoute>
   )
 }

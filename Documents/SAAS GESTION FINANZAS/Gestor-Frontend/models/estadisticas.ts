@@ -66,6 +66,15 @@ export interface TendenciasTemporales {
   datosGrafico: PuntoGrafico[]
 }
 
+// Subcategoría con análisis
+export interface SubcategoriaAnalisis {
+  nombre: string
+  monto: number
+  porcentaje: number
+  cantidad: number
+  promedio: number
+}
+
 // Categoría con análisis
 export interface CategoriaAnalisis {
   categoria: string
@@ -74,6 +83,7 @@ export interface CategoriaAnalisis {
   cantidad: number
   promedio: number
   tendencia: 'aumento' | 'disminucion' | 'estable'
+  subcategorias?: SubcategoriaAnalisis[] // Array de subcategorías con análisis (opcional)
 }
 
 // Análisis por categorías

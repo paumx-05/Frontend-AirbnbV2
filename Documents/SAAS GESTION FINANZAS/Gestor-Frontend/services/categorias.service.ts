@@ -230,6 +230,7 @@ export const categoriasService = {
     console.log('[CATEGORIAS SERVICE] Creando categoría:', {
       nombre: validated.data.nombre,
       tipo: validated.data.tipo,
+      subcategorias: validated.data.subcategorias?.length || 0,
     })
     
     const response = await fetchAPI<BackendCategoriaResponse>(
@@ -244,7 +245,8 @@ export const categoriasService = {
     console.log('[CATEGORIAS SERVICE] Categoría creada exitosamente:', {
       id: response.data._id,
       userId: response.data.userId,
-      nombre: response.data.nombre
+      nombre: response.data.nombre,
+      subcategorias: response.data.subcategorias?.length || 0,
     })
     
     return response.data
@@ -263,6 +265,12 @@ export const categoriasService = {
       } as CategoriaError
     }
     
+    console.log('[CATEGORIAS SERVICE] Actualizando categoría:', {
+      id,
+      campos: Object.keys(validated.data),
+      subcategorias: validated.data.subcategorias?.length || 'no actualizadas',
+    })
+    
     const response = await fetchAPI<BackendCategoriaResponse>(
       API_CONFIG.ENDPOINTS.CATEGORIAS.UPDATE(id),
       {
@@ -271,6 +279,12 @@ export const categoriasService = {
       },
       CategoriaResponseSchema
     )
+    
+    console.log('[CATEGORIAS SERVICE] Categoría actualizada exitosamente:', {
+      id: response.data._id,
+      nombre: response.data.nombre,
+      subcategorias: response.data.subcategorias?.length || 0,
+    })
     
     return response.data
   },

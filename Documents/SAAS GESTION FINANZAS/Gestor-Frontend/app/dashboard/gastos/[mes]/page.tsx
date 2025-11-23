@@ -13,6 +13,7 @@ import { getNombresCategoriasPorTipo } from '@/lib/categorias'
 import { getPresupuestos } from '@/lib/presupuestos'
 import { getAmigos } from '@/lib/amigos'
 import { useCartera } from '@/hooks/useCartera'
+import SubcategoriaSelector from '@/components/SubcategoriaSelector'
 
 // Mapeo de valores de mes a nombres completos
 const mesesNombres: { [key: string]: string } = {
@@ -42,6 +43,7 @@ export default function GastosMesPage() {
   const [monto, setMonto] = useState('')
   const [fecha, setFecha] = useState('')
   const [categoria, setCategoria] = useState('')
+  const [subcategoria, setSubcategoria] = useState('')
   const [loading, setLoading] = useState(false)
   
   // Estados para dividir gasto con amigos
@@ -314,6 +316,19 @@ export default function GastosMesPage() {
     const usuarioActual = getUsuarioActual()
     if (usuarioActual) {
       try {
+        // IMPORTANTE: Procesar subcategoria correctamente según documentación del backend
+        // Si tiene valor (string no vacío), enviar como string
+        // Si no tiene valor, enviar como null (NO undefined)
+        const subcategoriaProcesada: string | null = subcategoria && subcategoria.trim().length > 0 
+          ? subcategoria.trim() 
+          : null
+        
+        console.log('[PAGE GASTOS] 📤 Procesando subcategoría:', {
+          valorOriginal: subcategoria,
+          valorProcesado: subcategoriaProcesada,
+          tipo: typeof subcategoriaProcesada
+        })
+        
         if (gastoEditando) {
           // Modo edición: actualizar gasto existente
           await updateGasto(gastoEditando, {
@@ -321,6 +336,7 @@ export default function GastosMesPage() {
             monto: montoUsuario,
             fecha: fecha,
             categoria: categoria || 'Otros',
+            subcategoria: subcategoriaProcesada as string | undefined, // Cast para compatibilidad con tipo
             dividido: informacionDividida
           })
         } else {
@@ -334,6 +350,7 @@ export default function GastosMesPage() {
               fecha: fecha,
               mes: mes,
               categoria: categoria || 'Otros',
+              subcategoria: subcategoriaProcesada as string | undefined, // Cast para compatibilidad con tipo
               dividido: informacionDividida
             }, 
             usuarioActual.id, 
@@ -371,6 +388,7 @@ export default function GastosMesPage() {
     const fechaFormateada = fechaDate.toISOString().split('T')[0]
     setFecha(fechaFormateada)
     setCategoria(gasto.categoria)
+    setSubcategoria(gasto.subcategoria || '')
     
     // Si el gasto tiene división, cargar esa información
     // ⚠️ IMPORTANTE: El backend devuelve amigoId como amigoUserId
@@ -421,6 +439,7 @@ export default function GastosMesPage() {
     setMonto('')
     setFecha('')
     setCategoria('')
+    setSubcategoria('')
     setDividirGasto(false)
     setModoDivision('iguales')
     setAmigosSeleccionados([])
@@ -612,7 +631,10 @@ export default function GastosMesPage() {
                   name="categoria"
                   className="form-input"
                   value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
+                  onChange={(e) => {
+                    setCategoria(e.target.value)
+                    setSubcategoria('') // Resetear subcategoría al cambiar categoría
+                  }}
                   required
                   disabled={loading}
                 >
@@ -624,6 +646,14 @@ export default function GastosMesPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Selector de Subcategoría */}
+              <SubcategoriaSelector
+                categoriaSeleccionada={categoria}
+                subcategoriaSeleccionada={subcategoria}
+                onChange={setSubcategoria}
+                disabled={loading}
+              />
 
               {/* Opción para dividir gasto - Minimalista */}
               <div className="gasto-dividir-container">
@@ -850,7 +880,12 @@ export default function GastosMesPage() {
                         <div className="gasto-item-header">
                           <div className="gasto-item-left">
                             <h3 className="gasto-item-descripcion">{gasto.descripcion}</h3>
-                            <span className="gasto-item-categoria">{gasto.categoria}</span>
+                            <div className="gasto-item-categorias">
+                              <span className="gasto-item-categoria">{gasto.categoria}</span>
+                              {gasto.subcategoria && (
+                                <span className="gasto-item-subcategoria">→ {gasto.subcategoria}</span>
+                              )}
+                            </div>
                           </div>
                           <span className="gasto-item-monto">{formatMonto(gasto.monto)}</span>
                         </div>

@@ -1,7 +1,8 @@
 'use client'
 
-// Componente Sidebar - Menú vertical lateral
+// Componente Sidebar - Menú vertical lateral con soporte mobile
 // Muestra todas las opciones de la aplicación con navegación
+// En móvil se comporta como un menú hamburguesa
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -54,14 +55,40 @@ export default function Sidebar() {
   // Estado para controlar si el sidebar está colapsado
   const [isCollapsed, setIsCollapsed] = useState(shouldCollapse)
   
+  // Estado para controlar si el menú móvil está abierto
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+  
   // Actualizar estado cuando cambia la ruta
   useEffect(() => {
     setIsCollapsed(shouldCollapse)
   }, [pathname, shouldCollapse])
   
+  // Cerrar menú móvil cuando cambia la ruta
+  useEffect(() => {
+    setIsMobileOpen(false)
+  }, [pathname])
+  
+  // Detectar si es móvil
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
   // Función para toggle del sidebar
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed)
+    if (isMobile) {
+      setIsMobileOpen(!isMobileOpen)
+    } else {
+      setIsCollapsed(!isCollapsed)
+    }
   }
   
   // Estado para controlar si el desplegable de gastos está abierto
@@ -87,23 +114,69 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-header">
-        {!isCollapsed && <h2 className="sidebar-title">Gestor Finanzas</h2>}
+    <>
+      {/* Botón hamburguesa para móvil */}
+      {isMobile && (
         <button
           onClick={toggleSidebar}
-          className="sidebar-toggle-btn"
-          title={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
-          aria-label={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          className="mobile-menu-toggle"
+          aria-label="Abrir menú"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {isCollapsed ? (
-              <polyline points="9 18 15 12 9 6"></polyline>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {isMobileOpen ? (
+              <path d="M6 18L18 6M6 6l12 12" />
             ) : (
-              <polyline points="15 18 9 12 15 6"></polyline>
+              <>
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </>
             )}
           </svg>
         </button>
+      )}
+
+      {/* Overlay para cerrar el menú en móvil */}
+      {isMobile && isMobileOpen && (
+        <div 
+          className="sidebar-overlay active"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile && isMobileOpen ? 'mobile-open' : ''}`}>
+      <div className="sidebar-header">
+        {!isCollapsed && <h2 className="sidebar-title">Gestor Finanzas</h2>}
+        {!isMobile && (
+          <button
+            onClick={toggleSidebar}
+            className="sidebar-toggle-btn"
+            title={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+            aria-label={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {isCollapsed ? (
+                <polyline points="9 18 15 12 9 6"></polyline>
+              ) : (
+                <polyline points="15 18 9 12 15 6"></polyline>
+              )}
+            </svg>
+          </button>
+        )}
+        {isMobile && (
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="sidebar-toggle-btn"
+            title="Cerrar menú"
+            aria-label="Cerrar menú"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        )}
       </div>
 
       <nav className="sidebar-nav">
@@ -249,9 +322,20 @@ export default function Sidebar() {
           {!isCollapsed && <span className="sidebar-text">Gestión de Carteras</span>}
         </Link>
 
+        {/* Opción de Opciones/Configuración */}
+        <Link 
+          href="/dashboard/opciones" 
+          className={`sidebar-item ${pathname?.startsWith('/dashboard/opciones') ? 'active' : ''}`}
+          title="Opciones y Configuración"
+        >
+          <span className="sidebar-icon">⚙️</span>
+          {!isCollapsed && <span className="sidebar-text">Opciones</span>}
+        </Link>
+
         {/* Espacio para futuras opciones del menú */}
       </nav>
     </aside>
+    </>
   )
 }
 

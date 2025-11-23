@@ -193,15 +193,42 @@ export const gastosService = {
       ? response.total 
       : (response.data || []).reduce((sum: number, gasto: Gasto) => sum + gasto.monto, 0)
     
-    // Log para depuración
+    // Log para depuración - Detallado para gastos con subcategorías
+    const gastosConSubcategoria = response.data?.filter((g: any) => g.subcategoria && g.subcategoria.trim() !== '') || []
     console.log('[GASTOS SERVICE] Respuesta del backend:', {
       mes,
       cantidadGastos: response.data?.length || 0,
+      gastosConSubcategoria: gastosConSubcategoria.length,
       totalDelBackend: response.total,
       totalCalculado: totalCalculado,
-      gastos: response.data,
-      userIdsEnGastos: response.data?.map((g: any) => g.userId) || []
     })
+    
+    // Log detallado de gastos con subcategorías
+    if (gastosConSubcategoria.length > 0) {
+      console.log('[GASTOS SERVICE] 📋 Gastos con subcategoría en mes', mes, ':', gastosConSubcategoria.map((g: any) => ({
+        id: g._id,
+        categoria: g.categoria,
+        subcategoria: g.subcategoria,
+        monto: g.monto,
+        fecha: g.fecha
+      })))
+    }
+    
+    // Log de gastos de Ropa específicamente
+    const gastosRopa = response.data?.filter((g: any) => g.categoria && g.categoria.toLowerCase().includes('ropa')) || []
+    if (gastosRopa.length > 0) {
+      console.log('[GASTOS SERVICE] 👕 Gastos de Ropa en mes', mes, ':', gastosRopa.map((g: any) => ({
+        id: g._id,
+        categoria: g.categoria,
+        subcategoria: g.subcategoria,
+        subcategoriaType: typeof g.subcategoria,
+        subcategoriaIsNull: g.subcategoria === null,
+        subcategoriaIsUndefined: g.subcategoria === undefined,
+        monto: g.monto,
+        fecha: g.fecha,
+        todasLasPropiedades: Object.keys(g)
+      })))
+    }
     
     // El backend devuelve { success: true, data: [...], total: ... }
     // Si total no viene, lo calculamos sumando los montos
@@ -226,6 +253,15 @@ export const gastosService = {
     // Solo incluir mes si tiene valor
     if (gastoData.mes) {
       cleanData.mes = gastoData.mes
+    }
+    
+    // IMPORTANTE: Procesar subcategoria según documentación del backend
+    // Si tiene valor (string no vacío), incluir como string
+    // Si no tiene valor, incluir como null (NO undefined)
+    if (gastoData.subcategoria && gastoData.subcategoria.trim().length > 0) {
+      cleanData.subcategoria = gastoData.subcategoria.trim()
+    } else {
+      cleanData.subcategoria = null // Enviar null explícito, NO undefined
     }
     
     // IMPORTANTE: Solo incluir carteraId si tiene un valor válido (no null, no undefined, no string vacío)
@@ -259,6 +295,13 @@ export const gastosService = {
       finalData.mes = validated.data.mes
     }
     
+    // IMPORTANTE: Incluir subcategoria siempre (null o string)
+    finalData.subcategoria = validated.data.subcategoria !== undefined 
+      ? (validated.data.subcategoria && validated.data.subcategoria.trim().length > 0 
+          ? validated.data.subcategoria.trim() 
+          : null)
+      : null
+    
     // Solo incluir carteraId si está presente y tiene valor válido
     if (validated.data.carteraId && validated.data.carteraId.trim() !== '') {
       finalData.carteraId = validated.data.carteraId
@@ -273,10 +316,16 @@ export const gastosService = {
       monto: finalData.monto,
       fecha: finalData.fecha,
       categoria: finalData.categoria,
+      subcategoria: finalData.subcategoria !== null ? finalData.subcategoria : 'null (sin subcategoría)',
       mes: finalData.mes || 'no incluido',
       carteraId: finalData.carteraId || 'no incluido',
       dividido: finalData.dividido ? `${finalData.dividido.length} elementos` : 'no incluido'
     })
+    
+    // DEBUG: Ver qué se está enviando al backend
+    console.log('[GASTOS SERVICE] 📤 Request body completo:', JSON.stringify(finalData, null, 2))
+    console.log('[GASTOS SERVICE] 📤 Tipo de subcategoria:', typeof finalData.subcategoria)
+    console.log('[GASTOS SERVICE] 📤 Valor de subcategoria:', finalData.subcategoria)
     
     const response = await fetchAPI<BackendGastoResponse>(
       API_CONFIG.ENDPOINTS.GASTOS.CREATE,
@@ -301,14 +350,72 @@ export const gastosService = {
    * Actualiza un gasto existente
    */
   async updateGasto(id: string, gastoData: UpdateGastoRequest): Promise<Gasto> {
+    // Construir objeto limpio procesando subcategoria correctamente
+    const cleanData: any = {}
+    
+    // Incluir solo campos que están presentes
+    if (gastoData.descripcion !== undefined) {
+      cleanData.descripcion = gastoData.descripcion
+    }
+    if (gastoData.monto !== undefined) {
+      cleanData.monto = gastoData.monto
+    }
+    if (gastoData.fecha !== undefined) {
+      cleanData.fecha = gastoData.fecha
+    }
+    if (gastoData.categoria !== undefined) {
+      cleanData.categoria = gastoData.categoria
+    }
+    if (gastoData.mes !== undefined) {
+      cleanData.mes = gastoData.mes
+    }
+    
+    // IMPORTANTE: Procesar subcategoria según documentación del backend
+    // Si está presente en el update, procesarlo correctamente
+    if (gastoData.subcategoria !== undefined) {
+      if (gastoData.subcategoria && gastoData.subcategoria.trim().length > 0) {
+        cleanData.subcategoria = gastoData.subcategoria.trim()
+      } else {
+        cleanData.subcategoria = null // Enviar null explícito, NO undefined
+      }
+    }
+    
+    if (gastoData.carteraId !== undefined) {
+      if (gastoData.carteraId && gastoData.carteraId.trim() !== '') {
+        cleanData.carteraId = gastoData.carteraId
+      }
+    }
+    
+    if (gastoData.dividido !== undefined) {
+      if (gastoData.dividido && gastoData.dividido.length > 0) {
+        cleanData.dividido = gastoData.dividido
+      }
+    }
+    
     // Validar request
-    const validated = UpdateGastoRequestSchema.safeParse(gastoData)
+    const validated = UpdateGastoRequestSchema.safeParse(cleanData)
     if (!validated.success) {
       throw {
         message: validated.error.issues[0].message,
         status: 400,
       } as GastoError
     }
+    
+    // Asegurar que subcategoria sea null o string (nunca undefined)
+    const finalData: any = { ...validated.data }
+    if (finalData.subcategoria !== undefined && (!finalData.subcategoria || finalData.subcategoria.trim().length === 0)) {
+      finalData.subcategoria = null
+    }
+    
+    console.log('[GASTOS SERVICE] Actualizando gasto:', {
+      id,
+      subcategoria: finalData.subcategoria !== undefined 
+        ? (finalData.subcategoria !== null ? finalData.subcategoria : 'null (sin subcategoría)')
+        : 'no incluido en update'
+    })
+    
+    // DEBUG: Ver qué se está enviando al backend
+    console.log('[GASTOS SERVICE] 📤 Update request body:', JSON.stringify(finalData, null, 2))
     
     const response = await fetchAPI<BackendGastoResponse>(
       API_CONFIG.ENDPOINTS.GASTOS.UPDATE(id),

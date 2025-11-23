@@ -2,8 +2,9 @@
 
 // Componente de gráfica circular (pie chart) para presupuestos
 // Muestra la distribución de presupuestos por categorías
+// Optimizado para responsive mobile
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface PieChartProps {
   data: Array<{
@@ -35,10 +36,29 @@ const COLOR_AHORRO = '#10b981'
 export default function PieChart({ data, total, size = 300 }: PieChartProps) {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const [responsiveSize, setResponsiveSize] = useState(size)
   
-  const centerX = size / 2
-  const centerY = size / 2
-  const radius = size / 2 - 20
+  // Ajustar tamaño según el ancho de pantalla
+  useEffect(() => {
+    const updateSize = () => {
+      if (window.innerWidth <= 480) {
+        setResponsiveSize(Math.min(260, window.innerWidth - 48))
+      } else if (window.innerWidth <= 768) {
+        setResponsiveSize(Math.min(300, window.innerWidth - 80))
+      } else {
+        setResponsiveSize(size)
+      }
+    }
+    
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    
+    return () => window.removeEventListener('resize', updateSize)
+  }, [size])
+  
+  const centerX = responsiveSize / 2
+  const centerY = responsiveSize / 2
+  const radius = responsiveSize / 2 - 20
   
   // Calcular los ángulos para cada segmento
   let currentAngle = -90 // Empezar desde arriba
@@ -125,8 +145,28 @@ export default function PieChart({ data, total, size = 300 }: PieChartProps) {
 
   return (
     <div className="pie-chart-container">
-      <div className="pie-chart-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
-        <svg width={size} height={size} className="pie-chart-svg">
+      <div className="pie-chart-wrapper" style={{ 
+        position: 'relative', 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        maxWidth: '100%',
+        margin: '0 auto'
+      }}>
+        <svg 
+          width={responsiveSize} 
+          height={responsiveSize} 
+          className="pie-chart-svg"
+          viewBox={`0 0 ${responsiveSize} ${responsiveSize}`}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ 
+            maxWidth: '100%', 
+            height: 'auto',
+            display: 'block',
+            margin: '0 auto'
+          }}
+        >
           {segments.map((segment, index) => (
             <g key={index}>
               <path
@@ -148,7 +188,7 @@ export default function PieChart({ data, total, size = 300 }: PieChartProps) {
                   dominantBaseline="middle"
                   className="pie-label"
                   fill="#f8fafc"
-                  fontSize="12"
+                  fontSize={responsiveSize < 300 ? "10" : "12"}
                   fontWeight="600"
                 >
                   {segment.porcentaje.toFixed(0)}%
@@ -172,7 +212,7 @@ export default function PieChart({ data, total, size = 300 }: PieChartProps) {
           dominantBaseline="middle"
           className="pie-center-total"
           fill="#f8fafc"
-          fontSize="18"
+          fontSize={responsiveSize < 300 ? "14" : "18"}
           fontWeight="700"
         >
           Total
@@ -184,7 +224,7 @@ export default function PieChart({ data, total, size = 300 }: PieChartProps) {
           dominantBaseline="middle"
           className="pie-center-amount"
           fill="#3b82f6"
-          fontSize="14"
+          fontSize={responsiveSize < 300 ? "11" : "14"}
           fontWeight="600"
         >
           {new Intl.NumberFormat('es-ES', {

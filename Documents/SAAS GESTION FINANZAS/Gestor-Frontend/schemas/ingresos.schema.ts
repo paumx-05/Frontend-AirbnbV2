@@ -36,6 +36,7 @@ export const IngresoSchema = z.object({
   monto: z.number().positive(),
   fecha: z.string(), // ISO date string
   categoria: z.string(),
+  subcategoria: z.string().optional(), // Subcategoría (opcional)
   mes: z.string(),
   createdAt: z.string().optional(), // ISO date string
 })
@@ -49,6 +50,7 @@ export const CreateIngresoRequestSchema = z.object({
     z.date(),
   ]),
   categoria: z.string().min(1, 'La categoría es requerida'),
+  subcategoria: z.string().optional(), // Subcategoría (opcional)
   mes: MesValidoSchema,
   carteraId: z.string().optional(), // Opcional: ID de la cartera
 })
@@ -62,6 +64,7 @@ export const UpdateIngresoRequestSchema = z.object({
     z.date().optional(),
   ]),
   categoria: z.string().min(1).optional(),
+  subcategoria: z.string().optional(), // Subcategoría (opcional)
   mes: MesValidoSchema.optional(),
   carteraId: z.string().optional(), // Opcional: ID de la cartera
 }).refine(

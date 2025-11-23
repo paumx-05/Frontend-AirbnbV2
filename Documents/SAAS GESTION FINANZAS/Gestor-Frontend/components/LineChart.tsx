@@ -1,9 +1,9 @@
 'use client'
 
-// Componente de gráfico de líneas
+// Componente de gráfico de líneas responsive
 // Muestra tendencias temporales de ingresos y gastos (acumulados)
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { PuntoGrafico } from '@/models/estadisticas'
 
 interface PuntoGraficoConBalance extends PuntoGrafico {
@@ -42,6 +42,41 @@ export default function LineChart({
 }: LineChartProps) {
   // Estado para el tooltip
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
+  
+  // Estado para tamaño responsive
+  const [responsiveWidth, setResponsiveWidth] = useState(width)
+  const [responsiveHeight, setResponsiveHeight] = useState(height)
+  
+  // Ajustar tamaño según viewport
+  useEffect(() => {
+    const updateSize = () => {
+      const viewportWidth = window.innerWidth
+      
+      if (viewportWidth <= 480) {
+        // Extra small
+        setResponsiveWidth(Math.min(360, viewportWidth - 32))
+        setResponsiveHeight(280)
+      } else if (viewportWidth <= 768) {
+        // Mobile
+        setResponsiveWidth(Math.min(600, viewportWidth - 48))
+        setResponsiveHeight(320)
+      } else if (viewportWidth <= 1024) {
+        // Tablet
+        setResponsiveWidth(Math.min(700, viewportWidth - 80))
+        setResponsiveHeight(360)
+      } else {
+        // Desktop
+        setResponsiveWidth(width)
+        setResponsiveHeight(height)
+      }
+    }
+    
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    
+    return () => window.removeEventListener('resize', updateSize)
+  }, [width, height])
+  
   if (data.length === 0) {
     return (
       <div className="line-chart-empty">
@@ -58,10 +93,15 @@ export default function LineChart({
     : 0
   const maxValor = Math.max(maxIngresos, maxGastos, maxBalance) * 1.1 // 10% de margen
 
-  // Dimensiones del gráfico
-  const padding = { top: 20, right: 40, bottom: 40, left: 60 }
-  const chartWidth = width - padding.left - padding.right
-  const chartHeight = height - padding.top - padding.bottom
+  // Dimensiones del gráfico (ajustadas para móvil)
+  const padding = responsiveWidth < 480 
+    ? { top: 15, right: 20, bottom: 35, left: 45 }
+    : responsiveWidth < 768
+    ? { top: 18, right: 30, bottom: 38, left: 50 }
+    : { top: 20, right: 40, bottom: 40, left: 60 }
+    
+  const chartWidth = responsiveWidth - padding.left - padding.right
+  const chartHeight = responsiveHeight - padding.top - padding.bottom
 
   // Función para convertir valor a coordenada Y
   const valorAY = (valor: number) => {
@@ -169,9 +209,22 @@ export default function LineChart({
     setTooltip(null)
   }
 
+  // Ajustar tamaño de fuente según viewport
+  const fontSize = responsiveWidth < 480 ? 8 : responsiveWidth < 768 ? 9 : 10
+  const strokeWidth = responsiveWidth < 480 ? 2 : 3
+  const dotRadius = responsiveWidth < 480 ? 3 : 4
+  const hitAreaRadius = responsiveWidth < 480 ? 6 : 8
+  
   return (
     <div className="line-chart-container">
-      <svg width={width} height={height} className="line-chart-svg">
+      <svg 
+        width={responsiveWidth} 
+        height={responsiveHeight} 
+        className="line-chart-svg"
+        viewBox={`0 0 ${responsiveWidth} ${responsiveHeight}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+      >
         {/* Fondo */}
         <rect
           x={padding.left}
@@ -213,16 +266,17 @@ export default function LineChart({
                 strokeDasharray="4,4"
               />
               <text
-                x={padding.left - 10}
-                y={y + 4}
+                x={padding.left - 5}
+                y={y + 3}
                 textAnchor="end"
                 fill="#94a3b8"
-                fontSize="10"
+                fontSize={fontSize}
               >
                 {new Intl.NumberFormat('es-ES', {
                   style: 'currency',
                   currency: 'EUR',
                   maximumFractionDigits: 0,
+                  notation: responsiveWidth < 480 ? 'compact' : 'standard'
                 }).format(valor)}
               </text>
             </g>
@@ -244,7 +298,7 @@ export default function LineChart({
           points={puntosIngresos}
           fill="none"
           stroke="#10b981"
-          strokeWidth="3"
+          strokeWidth={strokeWidth}
           transform={`translate(${padding.left}, ${padding.top})`}
         />
 
@@ -253,7 +307,7 @@ export default function LineChart({
           points={puntosGastos}
           fill="none"
           stroke="#ef4444"
-          strokeWidth="3"
+          strokeWidth={strokeWidth}
           transform={`translate(${padding.left}, ${padding.top})`}
         />
 
@@ -263,7 +317,7 @@ export default function LineChart({
             points={puntosBalance}
             fill="none"
             stroke="#3b82f6"
-            strokeWidth="2"
+            strokeWidth={strokeWidth - 1}
             strokeDasharray="5,5"
             transform={`translate(${padding.left}, ${padding.top})`}
             opacity="0.7"
@@ -276,7 +330,7 @@ export default function LineChart({
             <circle
               cx={padding.left + indiceAX(i)}
               cy={padding.top + valorAY(d.ingresos)}
-              r="8"
+              r={hitAreaRadius}
               fill="transparent"
               style={{ cursor: 'pointer' }}
               onMouseEnter={() => handlePuntoHover(d, i, 'ingreso')}
@@ -285,7 +339,7 @@ export default function LineChart({
             <circle
               cx={padding.left + indiceAX(i)}
               cy={padding.top + valorAY(d.ingresos)}
-              r="4"
+              r={dotRadius}
               fill="#10b981"
               stroke="#0f172a"
               strokeWidth="2"
@@ -300,7 +354,7 @@ export default function LineChart({
             <circle
               cx={padding.left + indiceAX(i)}
               cy={padding.top + valorAY(d.gastos)}
-              r="8"
+              r={hitAreaRadius}
               fill="transparent"
               style={{ cursor: 'pointer' }}
               onMouseEnter={() => handlePuntoHover(d, i, 'gasto')}
@@ -309,7 +363,7 @@ export default function LineChart({
             <circle
               cx={padding.left + indiceAX(i)}
               cy={padding.top + valorAY(d.gastos)}
-              r="4"
+              r={dotRadius}
               fill="#ef4444"
               stroke="#0f172a"
               strokeWidth="2"
@@ -319,18 +373,25 @@ export default function LineChart({
         ))}
 
         {/* Etiquetas del eje X */}
-        {data.map((d, i) => (
-          <text
-            key={`label-${i}`}
-            x={padding.left + indiceAX(i)}
-            y={height - padding.bottom + 20}
-            textAnchor="middle"
-            fill="#94a3b8"
-            fontSize="10"
-          >
-            {formatearFecha(d.fecha)}
-          </text>
-        ))}
+        {data.map((d, i) => {
+          // En móvil, mostrar solo algunas etiquetas si hay muchos datos
+          const mostrarEtiqueta = responsiveWidth < 480 
+            ? (data.length <= 7 || i % 2 === 0) // Mostrar 1 de cada 2 en móvil si hay muchos
+            : true
+          
+          return mostrarEtiqueta ? (
+            <text
+              key={`label-${i}`}
+              x={padding.left + indiceAX(i)}
+              y={responsiveHeight - padding.bottom + (responsiveWidth < 480 ? 15 : 20)}
+              textAnchor="middle"
+              fill="#94a3b8"
+              fontSize={fontSize}
+            >
+              {formatearFecha(d.fecha)}
+            </text>
+          ) : null
+        })}
       </svg>
 
       {/* Leyenda */}

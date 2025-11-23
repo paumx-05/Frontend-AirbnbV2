@@ -30,6 +30,7 @@ export const GastoSchema = z.object({
   monto: z.number().positive(),
   fecha: z.string(), // ISO date string
   categoria: z.string(),
+  subcategoria: z.string().optional(), // Subcategoría (opcional)
   mes: z.string(),
   dividido: DivididoSchema,
   createdAt: z.string().optional(), // ISO date string
@@ -41,6 +42,7 @@ export const CreateGastoRequestSchema = z.object({
   monto: z.number().positive('El monto debe ser mayor a 0'),
   fecha: z.string().min(1, 'La fecha es requerida'),
   categoria: z.string().min(1, 'La categoría es requerida'),
+  subcategoria: z.string().optional(), // Subcategoría (opcional)
   mes: z.string().optional(), // Opcional: se extrae de la fecha si no se proporciona
   carteraId: z.string().optional(), // Opcional: ID de la cartera
   dividido: DivididoSchema, // Opcional: array de amigos con quienes se divide el gasto
@@ -52,6 +54,7 @@ export const UpdateGastoRequestSchema = z.object({
   monto: z.number().positive().optional(),
   fecha: z.string().optional(),
   categoria: z.string().min(1).optional(),
+  subcategoria: z.string().optional(), // Subcategoría (opcional)
   mes: z.string().optional(),
   carteraId: z.string().optional(), // Opcional: ID de la cartera
   dividido: DivididoSchema, // Opcional: si se envía, reemplaza completamente el array anterior

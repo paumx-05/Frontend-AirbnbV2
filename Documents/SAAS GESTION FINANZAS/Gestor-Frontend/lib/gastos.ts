@@ -14,6 +14,7 @@ export interface Gasto {
   fecha: string
   mes: string
   categoria: string
+  subcategoria?: string // Subcategoría (opcional)
   dividido?: Array<{
     amigoId: string
     amigoNombre: string
@@ -31,6 +32,7 @@ function adaptBackendGastoToLocal(backendGasto: BackendGasto): Gasto {
     fecha: backendGasto.fecha,
     mes: backendGasto.mes,
     categoria: backendGasto.categoria,
+    subcategoria: backendGasto.subcategoria,
     dividido: backendGasto.dividido,
   }
 }
@@ -102,6 +104,15 @@ export async function addGasto(mes: string, gasto: Omit<Gasto, 'id'>, userId?: s
       fecha: fechaISO,
       categoria: gasto.categoria,
       mes: gasto.mes || mes,
+    }
+    
+    // IMPORTANTE: Procesar subcategoria según documentación del backend
+    // Si tiene valor (string no vacío), incluir como string
+    // Si no tiene valor, incluir como null (NO undefined)
+    if (gasto.subcategoria && gasto.subcategoria.trim().length > 0) {
+      gastoData.subcategoria = gasto.subcategoria.trim()
+    } else {
+      gastoData.subcategoria = null // Enviar null explícito, NO undefined
     }
     
     // Solo incluir carteraId si tiene un valor válido
@@ -204,6 +215,7 @@ export async function updateGasto(gastoId: string, updates: {
   monto?: number
   fecha?: string
   categoria?: string
+  subcategoria?: string
   mes?: string
   carteraId?: string
   dividido?: Array<{

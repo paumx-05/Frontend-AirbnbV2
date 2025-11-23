@@ -24,6 +24,7 @@ export interface Ingreso {
   monto: number
   fecha: string // ISO date string
   categoria: string
+  subcategoria?: string // Subcategoría (opcional)
   mes: string
   createdAt?: string // ISO date string
 }
@@ -34,6 +35,7 @@ export interface CreateIngresoRequest {
   monto: number
   fecha: string | Date // ISO date string o Date object
   categoria: string
+  subcategoria?: string // Subcategoría (opcional)
   mes: MesValido
   carteraId?: string // Opcional: ID de la cartera
 }
@@ -44,6 +46,7 @@ export interface UpdateIngresoRequest {
   monto?: number
   fecha?: string | Date
   categoria?: string
+  subcategoria?: string // Subcategoría (opcional)
   mes?: MesValido
   carteraId?: string // Opcional: ID de la cartera
 }

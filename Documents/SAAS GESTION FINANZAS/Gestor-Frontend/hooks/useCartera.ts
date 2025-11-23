@@ -6,6 +6,24 @@ import { carterasController } from '@/controllers/carteras.controller'
 import type { CreateCarteraRequest, UpdateCarteraRequest } from '@/models/carteras'
 
 export function useCartera() {
+  // Verificar que estamos en el cliente antes de usar el contexto
+  if (typeof window === 'undefined') {
+    // En el servidor, retornar valores por defecto
+    return {
+      carteraActiva: null,
+      carteras: [],
+      carteraActivaId: null,
+      loading: true,
+      error: null,
+      setCarteraActiva: () => {},
+      setCarteraActivaId: () => {},
+      refreshCarteras: async () => {},
+      createCartera: async () => ({ success: false, error: 'No disponible en servidor' }),
+      updateCartera: async () => ({ success: false, error: 'No disponible en servidor' }),
+      deleteCartera: async () => ({ success: false, error: 'No disponible en servidor' }),
+    }
+  }
+  
   const context = useCarteraContext()
 
   /**

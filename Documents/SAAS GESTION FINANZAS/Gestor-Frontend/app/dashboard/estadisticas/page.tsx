@@ -6,8 +6,10 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { getAuth } from '@/lib/auth'
+import { getAuth, getUsuarioActual } from '@/lib/auth'
 import { estadisticasService } from '@/services/estadisticas.service'
+import { gastosService } from '@/services/gastos.service'
+import { getCategorias } from '@/lib/categorias'
 import { useCartera } from '@/hooks/useCartera'
 import type {
   ResumenEstadisticas,
@@ -15,7 +17,10 @@ import type {
   AnalisisCategorias,
   MetricasComportamiento,
   PeriodoEstadisticas,
+  CategoriaAnalisis,
+  SubcategoriaAnalisis,
 } from '@/models/estadisticas'
+import type { Gasto } from '@/models/gastos'
 import EstadisticasCard from '@/components/EstadisticasCard'
 import PeriodSelector from '@/components/PeriodSelector'
 import ComparativaCard from '@/components/ComparativaCard'
@@ -35,6 +40,9 @@ export default function EstadisticasPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [backendNoDisponible, setBackendNoDisponible] = useState(false)
+  
+  // Estado para expandir/colapsar subcategorías en la tabla
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   // Verificar autenticación al cargar
   useEffect(() => {
@@ -73,11 +81,412 @@ export default function EstadisticasPage() {
 
       console.log('[ESTADISTICAS] Datos cargados correctamente')
 
+      // Log detallado de categorías y subcategorías recibidas del backend
+      console.log('[ESTADISTICAS] Análisis de categorías recibido (RAW):', JSON.stringify(categoriasData, null, 2))
+      if (categoriasData.categoriasGastos) {
+        categoriasData.categoriasGastos.forEach((cat, idx) => {
+          console.log(`[ESTADISTICAS] Categoría de gasto ${idx + 1}:`, {
+            nombre: cat.categoria,
+            monto: cat.monto,
+            tieneSubcategorias: !!cat.subcategorias,
+            cantidadSubcategorias: cat.subcategorias?.length || 0,
+            subcategorias: cat.subcategorias,
+            tipoSubcategorias: typeof cat.subcategorias,
+            esArray: Array.isArray(cat.subcategorias)
+          })
+        })
+      }
+
+      // Verificar si el backend ya envió subcategorías
+      const backendTieneSubcategorias = categoriasData.categoriasGastos?.some(
+        cat => cat.subcategorias && Array.isArray(cat.subcategorias) && cat.subcategorias.length > 0
+      ) || false
+
+      console.log('[ESTADISTICAS] ========================================')
+      console.log('[ESTADISTICAS] 🔄 PROCESANDO SUBCATEGORÍAS')
+      console.log('[ESTADISTICAS] Backend tiene subcategorías:', backendTieneSubcategorias)
+      console.log('[ESTADISTICAS] ========================================')
+      
+      let categoriasDataConSubcategorias = categoriasData
+      
+      // Si el backend NO envió subcategorías, usar fallback (calcular desde gastos)
+      // Si el backend SÍ envió subcategorías, usar directamente esos datos
+      if (!backendTieneSubcategorias) {
+        console.log('[ESTADISTICAS] ⚠️ Backend no envió subcategorías, usando fallback...')
+        
+        try {
+        const usuarioActual = getUsuarioActual()
+        console.log('[ESTADISTICAS] 👤 Usuario actual:', usuarioActual ? 'Sí' : 'No')
+        
+        if (usuarioActual) {
+          // Obtener todas las categorías con sus subcategorías definidas
+          console.log('[ESTADISTICAS] 📥 Obteniendo categorías del backend...')
+          const categoriasCompletas = await getCategorias(usuarioActual.id)
+          console.log('[ESTADISTICAS] 📋 Categorías obtenidas:', categoriasCompletas.length)
+          
+          // Crear un mapa de categorías con sus subcategorías definidas
+          const categoriasConSubcategorias = new Map<string, string[]>()
+          categoriasCompletas.forEach(cat => {
+            if (cat.subcategorias && cat.subcategorias.length > 0) {
+              categoriasConSubcategorias.set(cat.nombre, cat.subcategorias)
+              console.log(`[ESTADISTICAS] 📦 Categoría "${cat.nombre}" tiene ${cat.subcategorias.length} subcategorías definidas:`, cat.subcategorias)
+            }
+          })
+          
+          // Obtener todos los gastos del periodo para calcular montos de subcategorías
+          if (categoriasConSubcategorias.size > 0) {
+            // Calcular rango de fechas según el periodo
+            const fechaFin = new Date()
+            let fechaInicio = new Date()
+            
+            if (periodo === 'mensual') {
+              fechaInicio = new Date(fechaFin.getFullYear(), fechaFin.getMonth(), 1)
+            } else if (periodo === 'anual') {
+              fechaInicio = new Date(fechaFin.getFullYear(), 0, 1)
+            } else {
+              // Semanal: últimos 7 días
+              fechaInicio = new Date(fechaFin)
+              fechaInicio.setDate(fechaInicio.getDate() - 7)
+            }
+            
+            // Obtener todos los meses que cubren el periodo
+            const meses: string[] = []
+            const currentDate = new Date(fechaInicio)
+            while (currentDate <= fechaFin) {
+              const mesNombre = currentDate.toLocaleDateString('es-ES', { month: 'long' })
+              meses.push(mesNombre)
+              currentDate.setMonth(currentDate.getMonth() + 1)
+            }
+            
+            // Obtener gastos de todos los meses del periodo
+            const todosLosGastos: Gasto[] = []
+            console.log(`[ESTADISTICAS] 📅 Rango de fechas:`, {
+              fechaInicio: fechaInicio.toISOString(),
+              fechaFin: fechaFin.toISOString(),
+              meses: meses
+            })
+            
+            for (const mes of meses) {
+              try {
+                const { gastos } = await gastosService.getGastosByMes(mes, carteraId)
+                console.log(`[ESTADISTICAS] 📅 Gastos obtenidos del mes ${mes}:`, gastos.length)
+                
+                // Log detallado de TODOS los gastos de Ropa del mes, sin filtrar
+                const gastosRopaMes = gastos.filter(g => g.categoria && g.categoria.toLowerCase().includes('ropa'))
+                if (gastosRopaMes.length > 0) {
+                  console.log(`[ESTADISTICAS] 👕 Gastos de Ropa en mes ${mes} (SIN filtrar):`, gastosRopaMes.length)
+                  gastosRopaMes.forEach((g, idx) => {
+                    const fechaGasto = new Date(g.fecha)
+                    const dentroRango = fechaGasto >= fechaInicio && fechaGasto <= fechaFin
+                    console.log(`[ESTADISTICAS] 👕 Gasto Ropa #${idx + 1} del mes ${mes}:`, {
+                      id: g._id,
+                      categoria: g.categoria,
+                      subcategoria: g.subcategoria,
+                      tieneSubcategoria: !!g.subcategoria,
+                      subcategoriaType: typeof g.subcategoria,
+                      subcategoriaValue: g.subcategoria,
+                      monto: g.monto,
+                      fecha: g.fecha,
+                      fechaGastoISO: fechaGasto.toISOString(),
+                      fechaInicioISO: fechaInicio.toISOString(),
+                      fechaFinISO: fechaFin.toISOString(),
+                      dentroRango: dentroRango,
+                      razonFueraRango: !dentroRango ? (
+                        fechaGasto < fechaInicio ? 'fecha anterior al inicio' : 
+                        fechaGasto > fechaFin ? 'fecha posterior al fin' : 'desconocido'
+                      ) : 'dentro del rango'
+                    })
+                  })
+                }
+                
+                // NO filtrar por fecha - incluir TODOS los gastos del mes
+                // El backend ya filtra por mes, así que incluimos todos
+                console.log(`[ESTADISTICAS] 📅 Gastos del mes ${mes} (SIN filtrar por fecha):`, gastos.length)
+                todosLosGastos.push(...gastos)
+              } catch (error) {
+                console.warn(`[ESTADISTICAS] Error al obtener gastos del mes ${mes}:`, error)
+              }
+            }
+            
+            console.log(`[ESTADISTICAS] 📊 Gastos obtenidos para calcular subcategorías:`, todosLosGastos.length)
+            
+            // Log detallado de los primeros gastos para ver su estructura
+            console.log(`[ESTADISTICAS] 🔍 Muestra de gastos (primeros 5):`, todosLosGastos.slice(0, 5).map(g => ({
+              id: g._id,
+              categoria: g.categoria,
+              subcategoria: g.subcategoria,
+              tieneSubcategoria: !!g.subcategoria,
+              subcategoriaType: typeof g.subcategoria,
+              subcategoriaValue: g.subcategoria,
+              monto: g.monto,
+              descripcion: g.descripcion,
+              todasLasPropiedades: Object.keys(g),
+              objetoCompleto: g
+            })))
+            
+            // Log de TODOS los gastos de "Ropa" para verificar
+            const gastosRopa = todosLosGastos.filter(g => g.categoria && g.categoria.toLowerCase().includes('ropa'))
+            console.log(`[ESTADISTICAS] 👕 Total gastos de Ropa:`, gastosRopa.length)
+            gastosRopa.forEach((g, idx) => {
+              console.log(`[ESTADISTICAS] 👕 Gasto Ropa #${idx + 1}:`, {
+                id: g._id,
+                categoria: g.categoria,
+                subcategoria: g.subcategoria,
+                tieneSubcategoria: !!g.subcategoria,
+                subcategoriaType: typeof g.subcategoria,
+                subcategoriaValue: g.subcategoria,
+                monto: g.monto,
+                descripcion: g.descripcion,
+                todasLasPropiedades: Object.keys(g),
+                objetoCompleto: JSON.stringify(g, null, 2)
+              })
+            })
+            
+            // Log de gastos con subcategorías
+            const gastosConSubcategoria = todosLosGastos.filter(g => g.subcategoria && g.subcategoria.trim() !== '')
+            console.log(`[ESTADISTICAS] 📋 Gastos con subcategoría:`, gastosConSubcategoria.length)
+            
+            // Verificar todos los gastos para ver cuáles tienen subcategoría
+            todosLosGastos.forEach((g, idx) => {
+              if (g.categoria && g.categoria.toLowerCase().includes('ropa')) {
+                console.log(`[ESTADISTICAS] 🔍 Gasto de Ropa #${idx}:`, {
+                  id: g._id,
+                  categoria: g.categoria,
+                  subcategoria: g.subcategoria,
+                  tieneSubcategoria: !!g.subcategoria,
+                  subcategoriaType: typeof g.subcategoria,
+                  subcategoriaValue: g.subcategoria,
+                  monto: g.monto,
+                  descripcion: g.descripcion,
+                  todasLasPropiedades: Object.keys(g)
+                })
+              }
+            })
+            
+            gastosConSubcategoria.forEach(g => {
+              console.log(`  - ${g.categoria} > ${g.subcategoria}: ${g.monto}€`)
+            })
+            
+            // Calcular subcategorías por categoría
+            const subcategoriasPorCategoria = new Map<string, Map<string, { monto: number; cantidad: number }>>()
+            
+            // Log detallado ANTES de procesar
+            console.log(`[ESTADISTICAS] 🔍 ANTES de procesar - Total gastos:`, todosLosGastos.length)
+            const gastosRopaAntes = todosLosGastos.filter(g => g.categoria && g.categoria.toLowerCase().includes('ropa'))
+            console.log(`[ESTADISTICAS] 🔍 Gastos de Ropa ANTES de procesar:`, gastosRopaAntes.length)
+            gastosRopaAntes.forEach((g, idx) => {
+              console.log(`[ESTADISTICAS] 🔍 Gasto Ropa #${idx + 1} ANTES de procesar:`, {
+                id: g._id,
+                categoria: g.categoria,
+                subcategoria: g.subcategoria,
+                subcategoriaRaw: g.subcategoria,
+                subcategoriaType: typeof g.subcategoria,
+                subcategoriaIsNull: g.subcategoria === null,
+                subcategoriaIsUndefined: g.subcategoria === undefined,
+                subcategoriaLength: g.subcategoria?.length,
+                monto: g.monto,
+                descripcion: g.descripcion,
+                todasLasPropiedades: Object.keys(g),
+                objetoCompleto: JSON.stringify(g, null, 2)
+              })
+            })
+            
+            todosLosGastos.forEach((gasto, idx) => {
+              // Verificar subcategoría con múltiples formas posibles
+              // El campo puede ser string, null, undefined, o no existir
+              const subcategoria = gasto.subcategoria !== null && gasto.subcategoria !== undefined
+                ? gasto.subcategoria
+                : (gasto as any).subcategoría || null
+              
+              // Validar que sea un string no vacío
+              const subcategoriaValida = subcategoria 
+                && typeof subcategoria === 'string' 
+                && subcategoria.trim().length > 0
+              
+              // Log detallado para gastos de Ropa
+              if (gasto.categoria && gasto.categoria.toLowerCase().includes('ropa')) {
+                console.log(`[ESTADISTICAS] 🔍 Procesando gasto Ropa #${idx}:`, {
+                  id: gasto._id,
+                  categoria: gasto.categoria,
+                  subcategoria: gasto.subcategoria,
+                  subcategoriaRaw: subcategoria,
+                  subcategoriaType: typeof subcategoria,
+                  subcategoriaValida: subcategoriaValida,
+                  subcategoriaTrim: subcategoriaValida ? subcategoria.trim() : 'N/A',
+                  monto: gasto.monto,
+                  descripcion: gasto.descripcion
+                })
+              }
+              
+              if (subcategoriaValida) {
+                const categoriaNombre = gasto.categoria.trim()
+                const subcategoriaTrim = subcategoria.trim()
+                
+                if (!subcategoriasPorCategoria.has(categoriaNombre)) {
+                  subcategoriasPorCategoria.set(categoriaNombre, new Map())
+                  console.log(`[ESTADISTICAS] 📦 Nueva categoría en mapa: "${categoriaNombre}"`)
+                }
+                
+                const subcategorias = subcategoriasPorCategoria.get(categoriaNombre)!
+                if (!subcategorias.has(subcategoriaTrim)) {
+                  subcategorias.set(subcategoriaTrim, { monto: 0, cantidad: 0 })
+                  console.log(`[ESTADISTICAS] 📦 Nueva subcategoría en mapa: "${categoriaNombre}" > "${subcategoriaTrim}"`)
+                }
+                
+                const datos = subcategorias.get(subcategoriaTrim)!
+                const montoAnterior = datos.monto
+                const cantidadAnterior = datos.cantidad
+                datos.monto += gasto.monto
+                datos.cantidad += 1
+                
+                console.log(`[ESTADISTICAS] ✅ Procesado gasto con subcategoría: ${categoriaNombre} > ${subcategoriaTrim}: ${gasto.monto}€ (Total: ${datos.monto}€, Cantidad: ${datos.cantidad})`)
+              } else if (gasto.categoria && gasto.categoria.toLowerCase().includes('ropa')) {
+                // Log solo para debugging de Ropa
+                console.log(`[ESTADISTICAS] ⚠️ Gasto de Ropa sin subcategoría válida:`, {
+                  id: gasto._id,
+                  categoria: gasto.categoria,
+                  subcategoria: gasto.subcategoria,
+                  subcategoriaRaw: subcategoria,
+                  subcategoriaType: typeof subcategoria,
+                  subcategoriaIsNull: subcategoria === null,
+                  subcategoriaIsUndefined: subcategoria === undefined,
+                  subcategoriaLength: typeof subcategoria === 'string' ? subcategoria.length : 'N/A',
+                  monto: gasto.monto,
+                  descripcion: gasto.descripcion
+                })
+              }
+            })
+            
+            console.log(`[ESTADISTICAS] 📦 Categorías con subcategorías calculadas:`, Array.from(subcategoriasPorCategoria.keys()))
+            subcategoriasPorCategoria.forEach((subs, cat) => {
+              console.log(`  - ${cat}:`, Array.from(subs.keys()))
+            })
+            
+            // Log del mapa de subcategorías calculadas ANTES de combinar
+            console.log(`[ESTADISTICAS] 📦 Mapa de subcategorías calculadas ANTES de combinar:`, {
+              categoriasEnMapa: Array.from(subcategoriasPorCategoria.keys()),
+              detalles: Array.from(subcategoriasPorCategoria.entries()).map(([cat, subs]) => ({
+                categoria: cat,
+                subcategorias: Array.from(subs.entries()).map(([sub, datos]) => ({
+                  nombre: sub,
+                  monto: datos.monto,
+                  cantidad: datos.cantidad
+                }))
+              }))
+            })
+            
+            // Combinar subcategorías definidas con gastos calculados
+            categoriasDataConSubcategorias = {
+              ...categoriasData,
+              categoriasGastos: categoriasData.categoriasGastos.map(cat => {
+                const categoriaNombre = cat.categoria.trim()
+                // Buscar subcategorías definidas (case-insensitive)
+                const subcategoriasDefinidas = categoriasConSubcategorias.get(categoriaNombre) || 
+                  Array.from(categoriasConSubcategorias.entries())
+                    .find(([key]) => key.toLowerCase().trim() === categoriaNombre.toLowerCase())?.[1] || []
+                
+                console.log(`[ESTADISTICAS] 🔍 Procesando categoría "${categoriaNombre}":`, {
+                  tieneSubcategoriasDefinidas: subcategoriasDefinidas.length > 0,
+                  subcategoriasDefinidas: subcategoriasDefinidas,
+                  categoriasEnMapa: Array.from(categoriasConSubcategorias.keys()),
+                  tieneGastosCalculados: subcategoriasPorCategoria.has(categoriaNombre)
+                })
+                
+                if (subcategoriasDefinidas.length > 0) {
+                  const montoCategoria = cat.monto || 0
+                  const totalGastos = categoriasData.totalGastos || 0
+                  
+                  // Buscar gastos calculados para esta categoría (case-insensitive)
+                  let gastosCalculados = subcategoriasPorCategoria.get(categoriaNombre)
+                  if (!gastosCalculados) {
+                    for (const [key, value] of subcategoriasPorCategoria.entries()) {
+                      if (key.toLowerCase().trim() === categoriaNombre.toLowerCase()) {
+                        gastosCalculados = value
+                        console.log(`[ESTADISTICAS] 🔄 Gastos encontrados con búsqueda case-insensitive: "${key}" -> "${categoriaNombre}"`)
+                        break
+                      }
+                    }
+                  }
+                  
+                  // Crear array de subcategorías combinando definidas con gastos
+                  const subcategoriasArray: SubcategoriaAnalisis[] = subcategoriasDefinidas.map(nombreSub => {
+                    // Buscar si hay gastos para esta subcategoría
+                    const gastosSub = gastosCalculados?.get(nombreSub) || null
+                    
+                    const monto = gastosSub?.monto || 0
+                    const cantidad = gastosSub?.cantidad || 0
+                    const porcentaje = totalGastos > 0 ? (monto / totalGastos) * 100 : 0
+                    const promedio = cantidad > 0 ? monto / cantidad : 0
+                    
+                    console.log(`[ESTADISTICAS] 📊 Subcategoría "${nombreSub}" de "${categoriaNombre}":`, {
+                      tieneGastos: !!gastosSub,
+                      monto: monto,
+                      cantidad: cantidad,
+                      porcentaje: porcentaje.toFixed(2) + '%',
+                      gastosCalculadosKeys: gastosCalculados ? Array.from(gastosCalculados.keys()) : 'N/A'
+                    })
+                    
+                    return {
+                      nombre: nombreSub,
+                      monto,
+                      porcentaje,
+                      cantidad,
+                      promedio,
+                    }
+                  })
+                  
+                  console.log(`[ESTADISTICAS] ✅ Subcategorías finales para "${categoriaNombre}":`, {
+                    definidas: subcategoriasDefinidas.length,
+                    conGastos: subcategoriasArray.filter(s => s.monto > 0).length,
+                    subcategorias: subcategoriasArray.map(s => ({
+                      nombre: s.nombre,
+                      monto: s.monto,
+                      cantidad: s.cantidad
+                    }))
+                  })
+                  
+                  return {
+                    ...cat,
+                    subcategorias: subcategoriasArray,
+                  }
+                }
+                
+                return cat
+              }),
+            }
+            
+            console.log('[ESTADISTICAS] ✅ Subcategorías añadidas a las categorías')
+          } else {
+            console.log('[ESTADISTICAS] ℹ️ No hay categorías con subcategorías definidas')
+          }
+        } else {
+          console.warn('[ESTADISTICAS] ⚠️ No hay usuario actual, no se pueden obtener subcategorías')
+        }
+        } catch (error) {
+          console.error('[ESTADISTICAS] ❌ Error al obtener subcategorías (fallback):', error)
+          console.error('[ESTADISTICAS] Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
+        }
+      } else {
+        console.log('[ESTADISTICAS] ✅ Backend envió subcategorías, usando datos del backend directamente')
+        // El backend ya envió subcategorías, usar directamente categoriasData
+        categoriasDataConSubcategorias = categoriasData
+      }
+
       // Actualizar estados
+      console.log('[ESTADISTICAS] 💾 Actualizando estados con datos finales...')
+      console.log('[ESTADISTICAS] Categorías finales antes de actualizar estado:', categoriasDataConSubcategorias.categoriasGastos.map(c => ({
+        nombre: c.categoria,
+        tieneSubcategorias: !!c.subcategorias && c.subcategorias.length > 0,
+        cantidad: c.subcategorias?.length || 0,
+        subcategorias: c.subcategorias
+      })))
+      
       setResumen(resumenData)
       setTendencias(tendenciasData)
-      setAnalisisCategorias(categoriasData)
+      setAnalisisCategorias(categoriasDataConSubcategorias)
       setMetricasComportamiento(comportamientoData)
+      
+      console.log('[ESTADISTICAS] ✅ Estados actualizados correctamente')
     } catch (error: any) {
       if (!cancelled) {
         console.error('[ESTADISTICAS] Error al cargar datos:', error)
@@ -138,6 +547,25 @@ export default function EstadisticasPage() {
   })) || []
 
   const totalGastosChart = analisisCategorias?.totalGastos || 0
+  
+  // Función para toggle expandir/colapsar subcategorías
+  const toggleExpandCategoria = (categoria: string) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoria)) {
+      newExpanded.delete(categoria)
+    } else {
+      newExpanded.add(categoria)
+    }
+    setExpandedCategories(newExpanded)
+  }
+  
+  // Función para formatear moneda
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(value)
+  }
 
   // Calcular datos acumulados para el gráfico
   const datosGraficoAcumulados = useMemo(() => {
@@ -379,39 +807,132 @@ export default function EstadisticasPage() {
                   <table className="estadisticas-table">
                     <thead>
                       <tr>
+                        <th style={{ width: '30px' }}></th>
                         <th>Categoría</th>
                         <th>Monto</th>
                         <th>%</th>
-                        <th>Transacciones</th>
+                        <th>Trans.</th>
                         <th>Promedio</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {analisisCategorias.categoriasGastos.map((cat, index) => (
-                        <tr key={index}>
-                          <td>
-                            <span
-                              className="estadisticas-categoria-color"
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            />
-                            {cat.categoria}
-                          </td>
-                          <td>
-                            {new Intl.NumberFormat('es-ES', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            }).format(cat.monto)}
-                          </td>
-                          <td>{cat.porcentaje.toFixed(1)}%</td>
-                          <td>{cat.cantidad}</td>
-                          <td>
-                            {new Intl.NumberFormat('es-ES', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            }).format(cat.promedio)}
-                          </td>
-                        </tr>
-                      ))}
+                      {(() => {
+                        console.log('[ESTADISTICAS UI] 🎨 ===== INICIANDO RENDERIZADO DE TABLA =====')
+                        console.log('[ESTADISTICAS UI] Total categorías:', analisisCategorias.categoriasGastos.length)
+                        analisisCategorias.categoriasGastos.forEach(c => {
+                          console.log(`[ESTADISTICAS UI] Categoría "${c.categoria}":`, {
+                            tieneSubcategorias: !!c.subcategorias && c.subcategorias.length > 0,
+                            cantidad: c.subcategorias?.length || 0,
+                            subcategorias: c.subcategorias
+                          })
+                        })
+                        return null
+                      })()}
+                      {analisisCategorias.categoriasGastos.map((cat, index) => {
+                        // Verificar si tiene subcategorías - con validación más robusta
+                        const subcategoriasArray = Array.isArray(cat.subcategorias) ? cat.subcategorias : []
+                        const hasSubcategorias = subcategoriasArray.length > 0
+                        const isExpanded = expandedCategories.has(cat.categoria)
+                        
+                        return (
+                          <>
+                            {/* Fila principal de categoría - SIEMPRE expandible */}
+                            <tr 
+                              key={`cat-${index}`}
+                              className="estadisticas-categoria-row expandible"
+                              onClick={() => {
+                                console.log(`[ESTADISTICAS UI] 🔄 Toggle categoría "${cat.categoria}", estado actual: ${isExpanded ? 'expandida' : 'colapsada'}`)
+                                toggleExpandCategoria(cat.categoria)
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <td className="estadisticas-expand-cell">
+                                <button
+                                  type="button"
+                                  className="estadisticas-expand-btn"
+                                  aria-label={isExpanded ? 'Ocultar subcategorías' : 'Ver subcategorías'}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    console.log(`[ESTADISTICAS UI] 🖱️ Click en botón expandir categoría "${cat.categoria}"`)
+                                    toggleExpandCategoria(cat.categoria)
+                                  }}
+                                  style={{ 
+                                    fontSize: '0.9rem',
+                                    padding: '2px 6px',
+                                    minWidth: '24px',
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  {isExpanded ? '▼' : '▶'}
+                                </button>
+                              </td>
+                              <td>
+                                <span
+                                  className="estadisticas-categoria-color"
+                                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                />
+                                <strong>{cat.categoria}</strong>
+                                {hasSubcategorias && (
+                                  <span style={{ 
+                                    marginLeft: '8px', 
+                                    fontSize: '0.75rem', 
+                                    color: '#94a3b8',
+                                    fontWeight: 'normal'
+                                  }}>
+                                    ({subcategoriasArray.length} subcategoría{subcategoriasArray.length > 1 ? 's' : ''})
+                                  </span>
+                                )}
+                              </td>
+                              <td><strong>{formatCurrency(cat.monto)}</strong></td>
+                              <td><strong>{cat.porcentaje.toFixed(1)}%</strong></td>
+                              <td><strong>{cat.cantidad}</strong></td>
+                              <td><strong>{formatCurrency(cat.promedio)}</strong></td>
+                            </tr>
+                            
+                            {/* Filas de subcategorías (expandible) - Mostrar siempre cuando está expandido */}
+                            {isExpanded && (
+                              <>
+                                {hasSubcategorias ? (
+                                  // Mostrar subcategorías si existen
+                                  subcategoriasArray.map((sub, subIndex) => {
+                                    console.log(`[ESTADISTICAS UI] ✅ Renderizando subcategoría "${sub.nombre}" de "${cat.categoria}":`, sub)
+                                    return (
+                                      <tr key={`subcat-${index}-${subIndex}`} className="estadisticas-subcategoria-row">
+                                        <td></td>
+                                        <td>
+                                          <span className="estadisticas-subcategoria-indent">↳</span>
+                                          <span style={{ fontWeight: 500 }}>{sub.nombre}</span>
+                                        </td>
+                                        <td className="text-muted">{formatCurrency(sub.monto)}</td>
+                                        <td className="text-muted">{sub.porcentaje.toFixed(1)}%</td>
+                                        <td className="text-muted">{sub.cantidad}</td>
+                                        <td className="text-muted">{formatCurrency(sub.promedio)}</td>
+                                      </tr>
+                                    )
+                                  })
+                                ) : (
+                                  // Mostrar mensaje si no hay subcategorías
+                                  <tr className="estadisticas-subcategoria-row">
+                                    <td></td>
+                                    <td colSpan={5} style={{ 
+                                      padding: '1rem',
+                                      textAlign: 'center',
+                                      color: '#94a3b8',
+                                      fontStyle: 'italic',
+                                      fontSize: '0.9rem'
+                                    }}>
+                                      No hay subcategorías registradas para esta categoría
+                                    </td>
+                                  </tr>
+                                )}
+                              </>
+                            )}
+                          </>
+                        )
+                      })}
                     </tbody>
                   </table>
                 ) : (

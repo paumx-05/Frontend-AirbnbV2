@@ -10,6 +10,7 @@ export interface Categoria {
   userId: string
   nombre: string
   tipo: TipoCategoria
+  subcategorias?: string[] // Array de subcategorías (opcional)
   createdAt: string // ISO date string
 }
 
@@ -17,12 +18,14 @@ export interface Categoria {
 export interface CreateCategoriaRequest {
   nombre: string
   tipo: TipoCategoria
+  subcategorias?: string[] // Array de subcategorías (opcional)
 }
 
 // Request para actualizar una categoría (todos los campos opcionales)
 export interface UpdateCategoriaRequest {
   nombre?: string
   tipo?: TipoCategoria
+  subcategorias?: string[] // Array de subcategorías (opcional)
 }
 
 // Respuesta del backend para obtener todas las categorías

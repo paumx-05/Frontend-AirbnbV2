@@ -12,6 +12,7 @@ import { ingresosService } from '@/services/ingresos.service'
 import type { Ingreso, MesValido } from '@/models/ingresos'
 import { getNombresCategoriasPorTipo } from '@/lib/categorias'
 import { useCartera } from '@/hooks/useCartera'
+import SubcategoriaSelector from '@/components/SubcategoriaSelector'
 
 // Mapeo de valores de mes a nombres completos
 const mesesNombres: { [key: string]: string } = {
@@ -41,6 +42,7 @@ export default function IngresosMesPage() {
   const [monto, setMonto] = useState('')
   const [fecha, setFecha] = useState('')
   const [categoria, setCategoria] = useState('')
+  const [subcategoria, setSubcategoria] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Estado para la lista de ingresos
@@ -167,6 +169,7 @@ export default function IngresosMesPage() {
         monto: parseFloat(monto),
         fecha: fechaDate,
         categoria: categoria || 'Otros',
+        subcategoria: subcategoria || undefined,
         mes: mes as MesValido,
       }
       
@@ -182,6 +185,7 @@ export default function IngresosMesPage() {
       setMonto('')
       setFecha('')
       setCategoria('')
+      setSubcategoria('')
 
       // Recargar ingresos
       await loadIngresos()
@@ -310,7 +314,10 @@ export default function IngresosMesPage() {
                   name="categoria"
                   className="form-input"
                   value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
+                  onChange={(e) => {
+                    setCategoria(e.target.value)
+                    setSubcategoria('') // Resetear subcategoría al cambiar categoría
+                  }}
                   required
                   disabled={loading}
                 >
@@ -322,6 +329,14 @@ export default function IngresosMesPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Selector de Subcategoría */}
+              <SubcategoriaSelector
+                categoriaSeleccionada={categoria}
+                subcategoriaSeleccionada={subcategoria}
+                onChange={setSubcategoria}
+                disabled={loading}
+              />
 
               <button 
                 type="submit" 
@@ -358,7 +373,12 @@ export default function IngresosMesPage() {
                       <div className="ingreso-item-header">
                         <div className="ingreso-item-left">
                           <h3 className="ingreso-item-descripcion">{ingreso.descripcion}</h3>
-                          <span className="ingreso-item-categoria">{ingreso.categoria}</span>
+                          <div className="ingreso-item-categorias">
+                            <span className="ingreso-item-categoria">{ingreso.categoria}</span>
+                            {ingreso.subcategoria && (
+                              <span className="ingreso-item-subcategoria">→ {ingreso.subcategoria}</span>
+                            )}
+                          </div>
                         </div>
                         <span className="ingreso-item-monto">{formatMonto(ingreso.monto)}</span>
                       </div>

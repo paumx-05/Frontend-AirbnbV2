@@ -22,6 +22,7 @@ export const CategoriaSchema = z.object({
   userId: z.string(),
   nombre: z.string().min(1, 'El nombre es requerido'),
   tipo: TipoCategoriaSchema,
+  subcategorias: z.array(z.string().trim().min(1)).optional(), // Array de subcategorías (opcional)
   createdAt: z.string(), // ISO date string
 })
 
@@ -29,12 +30,14 @@ export const CategoriaSchema = z.object({
 export const CreateCategoriaRequestSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').trim(),
   tipo: TipoCategoriaSchema,
+  subcategorias: z.array(z.string().trim().min(1)).max(20, 'Máximo 20 subcategorías').optional(), // Array de subcategorías (opcional, max 20)
 })
 
 // Schema para request de actualizar categoría (todos opcionales)
 export const UpdateCategoriaRequestSchema = z.object({
   nombre: z.string().min(1).trim().optional(),
   tipo: TipoCategoriaSchema.optional(),
+  subcategorias: z.array(z.string().trim().min(1)).max(20, 'Máximo 20 subcategorías').optional(), // Array de subcategorías (opcional, max 20)
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'Debe proporcionar al menos un campo para actualizar' }

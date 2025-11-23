@@ -10,6 +10,7 @@ export interface Gasto {
   monto: number
   fecha: string // ISO date string
   categoria: string
+  subcategoria?: string // Subcategoría (opcional)
   mes: string
   dividido?: Array<{
     amigoId: string
@@ -26,6 +27,7 @@ export interface CreateGastoRequest {
   monto: number
   fecha: string // ISO date string o formato "YYYY-MM-DD"
   categoria: string
+  subcategoria?: string // Subcategoría (opcional)
   mes?: string // Opcional: se extrae de la fecha si no se proporciona
   carteraId?: string // Opcional: ID de la cartera
   dividido?: Array<{
@@ -42,6 +44,7 @@ export interface UpdateGastoRequest {
   monto?: number
   fecha?: string
   categoria?: string
+  subcategoria?: string // Subcategoría (opcional)
   mes?: string
   carteraId?: string // Opcional: ID de la cartera
   dividido?: Array<{

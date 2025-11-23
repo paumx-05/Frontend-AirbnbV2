@@ -10,6 +10,7 @@ export interface Categoria {
   id: string
   nombre: string
   tipo: 'gasto' | 'ingreso' | 'ambos'
+  subcategorias?: string[] // Array de subcategorías (opcional)
   color?: string
   fechaCreacion: string
 }
@@ -64,6 +65,7 @@ function adaptCategoriaFromBackend(backendCategoria: BackendCategoria): Categori
     id: backendCategoria._id,
     nombre: backendCategoria.nombre,
     tipo: adaptTipoFromBackend(backendCategoria.tipo),
+    subcategorias: backendCategoria.subcategorias,
     fechaCreacion: backendCategoria.createdAt,
   }
 }
@@ -132,6 +134,7 @@ export async function addCategoria(
     const backendCategoria = await categoriasService.createCategoria({
       nombre: categoria.nombre.trim(),
       tipo: adaptTipoToBackend(categoria.tipo),
+      subcategorias: categoria.subcategorias,
     })
     
     return adaptCategoriaFromBackend(backendCategoria)
@@ -158,6 +161,10 @@ export async function updateCategoria(
     
     if (categoria.tipo !== undefined) {
       updateData.tipo = adaptTipoToBackend(categoria.tipo)
+    }
+    
+    if (categoria.subcategorias !== undefined) {
+      updateData.subcategorias = categoria.subcategorias
     }
     
     const backendCategoria = await categoriasService.updateCategoria(id, updateData)

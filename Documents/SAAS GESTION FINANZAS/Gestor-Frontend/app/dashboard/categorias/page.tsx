@@ -45,6 +45,12 @@ export default function CategoriasPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState<'gasto' | 'ingreso' | 'ambos'>('gasto')
+  
+  // Estados para expandir/colapsar subcategorías en la lista (toggle inline)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  
+  // Estado para inputs de nueva subcategoría por categoría
+  const [nuevaSubInput, setNuevaSubInput] = useState<Record<string, string>>({})
 
   // Verificar autenticación al cargar
   useEffect(() => {
@@ -77,7 +83,7 @@ export default function CategoriasPage() {
     }
   }
 
-  // Función para manejar el submit del formulario
+  // Función para manejar el submit del formulario (solo categoría principal, sin subcategorías)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -85,11 +91,17 @@ export default function CategoriasPage() {
 
     try {
       if (editingId) {
-        // Actualizar categoría existente
-        await updateCategoria(editingId, { nombre: nombre.trim(), tipo })
+        // Actualizar categoría existente (solo nombre y tipo, no subcategorías)
+        await updateCategoria(editingId, { 
+          nombre: nombre.trim(), 
+          tipo
+        })
       } else {
-        // Crear nueva categoría
-        await addCategoria({ nombre: nombre.trim(), tipo })
+        // Crear nueva categoría (sin subcategorías inicialmente)
+        await addCategoria({ 
+          nombre: nombre.trim(), 
+          tipo
+        })
       }
       
       await loadCategorias()
@@ -109,12 +121,96 @@ export default function CategoriasPage() {
     setError('')
   }
 
-  // Función para editar una categoría
+  // Función para editar una categoría (solo nombre y tipo)
   const handleEdit = (categoria: Categoria) => {
     setNombre(categoria.nombre)
     setTipo(categoria.tipo)
     setEditingId(categoria.id)
     setError('')
+  }
+  
+  // Función para toggle expandir/colapsar subcategorías inline
+  const toggleSubcategorias = (categoriaId: string) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoriaId)) {
+      newExpanded.delete(categoriaId)
+      // Limpiar input al colapsar
+      setNuevaSubInput({ ...nuevaSubInput, [categoriaId]: '' })
+    } else {
+      newExpanded.add(categoriaId)
+    }
+    setExpandedCategories(newExpanded)
+  }
+  
+  // Función para añadir subcategoría inline a una categoría específica
+  const handleAddSubcategoriaInline = async (categoriaId: string) => {
+    const nuevaSub = nuevaSubInput[categoriaId]?.trim()
+    if (!nuevaSub) return
+
+    const categoria = categorias.find(c => c.id === categoriaId)
+    if (!categoria) return
+
+    const subcategoriasActuales = categoria.subcategorias || []
+    
+    // Validaciones
+    if (subcategoriasActuales.includes(nuevaSub)) {
+      setError('Esta subcategoría ya existe')
+      return
+    }
+
+    if (subcategoriasActuales.length >= 20) {
+      setError('Máximo 20 subcategorías por categoría')
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError('')
+      
+      // Añadir la nueva subcategoría al array
+      const nuevasSubcategorias = [...subcategoriasActuales, nuevaSub]
+      
+      // Actualizar en el backend
+      await updateCategoria(categoriaId, {
+        subcategorias: nuevasSubcategorias
+      })
+      
+      // Limpiar input
+      setNuevaSubInput({ ...nuevaSubInput, [categoriaId]: '' })
+      
+      // Recargar categorías
+      await loadCategorias()
+    } catch (err: any) {
+      setError(err.message || 'Error al añadir subcategoría')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Función para eliminar subcategoría inline de una categoría específica
+  const handleRemoveSubcategoriaInline = async (categoriaId: string, index: number) => {
+    const categoria = categorias.find(c => c.id === categoriaId)
+    if (!categoria || !categoria.subcategorias) return
+
+    try {
+      setLoading(true)
+      setError('')
+      
+      // Eliminar la subcategoría del array
+      const nuevasSubcategorias = categoria.subcategorias.filter((_, i) => i !== index)
+      
+      // Actualizar en el backend
+      await updateCategoria(categoriaId, {
+        subcategorias: nuevasSubcategorias.length > 0 ? nuevasSubcategorias : []
+      })
+      
+      // Recargar categorías
+      await loadCategorias()
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar subcategoría')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Función para eliminar una categoría
@@ -245,42 +341,129 @@ export default function CategoriasPage() {
                   const nombreMes = getNombreMesActual()
                   const urlGastos = `/dashboard/gastos/${mesActual}?categoria=${encodeURIComponent(categoria.nombre)}`
                   
+                  const subcategoriasCount = categoria.subcategorias?.length || 0
+                  const isExpanded = expandedCategories.has(categoria.id)
+                  
                   return (
-                    <div key={categoria.id} className="categoria-item">
-                      <Link 
-                        href={urlGastos}
-                        className="categoria-item-link"
-                        title={`Ver gastos de ${categoria.nombre} en ${nombreMes}`}
-                      >
-                        <div className="categoria-item-content">
-                          <span className="categoria-nombre">{categoria.nombre}</span>
-                          <span className="categoria-tipo">
+                    <div key={categoria.id} className="categoria-card-v3">
+                      {/* Header de la categoría */}
+                      <div className="categoria-header">
+                        <div className="categoria-info-left">
+                          <Link 
+                            href={urlGastos}
+                            className="categoria-nombre-link"
+                            title={`Ver gastos de ${categoria.nombre} en ${nombreMes}`}
+                          >
+                            <h3 className="categoria-nombre">{categoria.nombre}</h3>
+                          </Link>
+                          <span className="categoria-tipo-badge">
                             {categoria.tipo === 'ambos' ? 'Gastos e Ingresos' : 'Solo Gastos'}
                           </span>
-                          <span className="categoria-link-hint">Click para ver en {nombreMes}</span>
                         </div>
-                      </Link>
-                      <div className="categoria-item-actions">
+                        <div className="categoria-actions">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handleEdit(categoria)
+                            }}
+                            className="btn-icon"
+                            title="Editar categoría"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handleDelete(categoria.id, categoria.nombre)
+                            }}
+                            className="btn-icon"
+                            title="Eliminar categoría"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Toggle de Subcategorías */}
+                      <div className="subcategorias-toggle-section">
                         <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            handleEdit(categoria)
-                          }}
-                          className="btn-icon"
-                          title="Editar"
+                          className="subcategorias-toggle-btn"
+                          onClick={() => toggleSubcategorias(categoria.id)}
+                          type="button"
                         >
-                          ✏️
+                          <span className="toggle-icon">
+                            {isExpanded ? '▼' : '▶'}
+                          </span>
+                          <span className="toggle-text">
+                            {subcategoriasCount} subcategoría{subcategoriasCount !== 1 ? 's' : ''}
+                          </span>
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            handleDelete(categoria.id, categoria.nombre)
-                          }}
-                          className="btn-icon"
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
+
+                        {isExpanded && (
+                          <div className="subcategorias-expanded-content">
+                            {/* Input para nueva subcategoría */}
+                            <div className="nueva-subcategoria-row">
+                              <input
+                                type="text"
+                                value={nuevaSubInput[categoria.id] || ''}
+                                onChange={(e) => setNuevaSubInput({
+                                  ...nuevaSubInput,
+                                  [categoria.id]: e.target.value
+                                })}
+                                placeholder="Ej: Supermercado"
+                                className="subcategoria-input-simple"
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleAddSubcategoriaInline(categoria.id)
+                                  }
+                                }}
+                                disabled={loading || subcategoriasCount >= 20}
+                                maxLength={50}
+                              />
+                              <button
+                                onClick={() => handleAddSubcategoriaInline(categoria.id)}
+                                className="btn-add-sub-inline"
+                                disabled={loading || !nuevaSubInput[categoria.id]?.trim() || subcategoriasCount >= 20}
+                                type="button"
+                                title="Añadir subcategoría"
+                              >
+                                + Añadir
+                              </button>
+                            </div>
+
+                            {/* Lista de subcategorías */}
+                            {categoria.subcategorias && categoria.subcategorias.length > 0 ? (
+                              <ul className="subcategorias-list-simple">
+                                {categoria.subcategorias.map((sub, idx) => (
+                                  <li key={idx} className="subcategoria-item-simple">
+                                    <span className="subcategoria-bullet">•</span>
+                                    <span className="subcategoria-text">{sub}</span>
+                                    <button
+                                      onClick={() => handleRemoveSubcategoriaInline(categoria.id, idx)}
+                                      className="btn-remove-sub-inline"
+                                      disabled={loading}
+                                      type="button"
+                                      title="Eliminar subcategoría"
+                                    >
+                                      ✕
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="subcategorias-empty">
+                                Sin subcategorías. Añade una arriba ↑
+                              </p>
+                            )}
+
+                            {subcategoriasCount >= 20 && (
+                              <p className="subcategorias-limit-warning">
+                                ⚠️ Límite máximo alcanzado (20 subcategorías)
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -303,42 +486,129 @@ export default function CategoriasPage() {
                   const nombreMes = getNombreMesActual()
                   const urlIngresos = `/dashboard/ingresos/${mesActual}?categoria=${encodeURIComponent(categoria.nombre)}`
                   
+                  const subcategoriasCount = categoria.subcategorias?.length || 0
+                  const isExpanded = expandedCategories.has(categoria.id)
+                  
                   return (
-                    <div key={categoria.id} className="categoria-item">
-                      <Link 
-                        href={urlIngresos}
-                        className="categoria-item-link"
-                        title={`Ver ingresos de ${categoria.nombre} en ${nombreMes}`}
-                      >
-                        <div className="categoria-item-content">
-                          <span className="categoria-nombre">{categoria.nombre}</span>
-                          <span className="categoria-tipo">
+                    <div key={categoria.id} className="categoria-card-v3">
+                      {/* Header de la categoría */}
+                      <div className="categoria-header">
+                        <div className="categoria-info-left">
+                          <Link 
+                            href={urlIngresos}
+                            className="categoria-nombre-link"
+                            title={`Ver ingresos de ${categoria.nombre} en ${nombreMes}`}
+                          >
+                            <h3 className="categoria-nombre">{categoria.nombre}</h3>
+                          </Link>
+                          <span className="categoria-tipo-badge">
                             {categoria.tipo === 'ambos' ? 'Gastos e Ingresos' : 'Solo Ingresos'}
                           </span>
-                          <span className="categoria-link-hint">Click para ver en {nombreMes}</span>
                         </div>
-                      </Link>
-                      <div className="categoria-item-actions">
+                        <div className="categoria-actions">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handleEdit(categoria)
+                            }}
+                            className="btn-icon"
+                            title="Editar categoría"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              handleDelete(categoria.id, categoria.nombre)
+                            }}
+                            className="btn-icon"
+                            title="Eliminar categoría"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Toggle de Subcategorías */}
+                      <div className="subcategorias-toggle-section">
                         <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            handleEdit(categoria)
-                          }}
-                          className="btn-icon"
-                          title="Editar"
+                          className="subcategorias-toggle-btn"
+                          onClick={() => toggleSubcategorias(categoria.id)}
+                          type="button"
                         >
-                          ✏️
+                          <span className="toggle-icon">
+                            {isExpanded ? '▼' : '▶'}
+                          </span>
+                          <span className="toggle-text">
+                            {subcategoriasCount} subcategoría{subcategoriasCount !== 1 ? 's' : ''}
+                          </span>
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            handleDelete(categoria.id, categoria.nombre)
-                          }}
-                          className="btn-icon"
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
+
+                        {isExpanded && (
+                          <div className="subcategorias-expanded-content">
+                            {/* Input para nueva subcategoría */}
+                            <div className="nueva-subcategoria-row">
+                              <input
+                                type="text"
+                                value={nuevaSubInput[categoria.id] || ''}
+                                onChange={(e) => setNuevaSubInput({
+                                  ...nuevaSubInput,
+                                  [categoria.id]: e.target.value
+                                })}
+                                placeholder="Ej: Freelance"
+                                className="subcategoria-input-simple"
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleAddSubcategoriaInline(categoria.id)
+                                  }
+                                }}
+                                disabled={loading || subcategoriasCount >= 20}
+                                maxLength={50}
+                              />
+                              <button
+                                onClick={() => handleAddSubcategoriaInline(categoria.id)}
+                                className="btn-add-sub-inline"
+                                disabled={loading || !nuevaSubInput[categoria.id]?.trim() || subcategoriasCount >= 20}
+                                type="button"
+                                title="Añadir subcategoría"
+                              >
+                                + Añadir
+                              </button>
+                            </div>
+
+                            {/* Lista de subcategorías */}
+                            {categoria.subcategorias && categoria.subcategorias.length > 0 ? (
+                              <ul className="subcategorias-list-simple">
+                                {categoria.subcategorias.map((sub, idx) => (
+                                  <li key={idx} className="subcategoria-item-simple">
+                                    <span className="subcategoria-bullet">•</span>
+                                    <span className="subcategoria-text">{sub}</span>
+                                    <button
+                                      onClick={() => handleRemoveSubcategoriaInline(categoria.id, idx)}
+                                      className="btn-remove-sub-inline"
+                                      disabled={loading}
+                                      type="button"
+                                      title="Eliminar subcategoría"
+                                    >
+                                      ✕
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="subcategorias-empty">
+                                Sin subcategorías. Añade una arriba ↑
+                              </p>
+                            )}
+
+                            {subcategoriasCount >= 20 && (
+                              <p className="subcategorias-limit-warning">
+                                ⚠️ Límite máximo alcanzado (20 subcategorías)
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

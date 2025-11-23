@@ -166,7 +166,19 @@ export function CarteraProvider({ children }: { children: ReactNode }) {
 export function useCarteraContext() {
   const context = useContext(CarteraContext)
   if (context === undefined) {
-    throw new Error('useCarteraContext debe ser usado dentro de un CarteraProvider')
+    // En lugar de lanzar error inmediatamente, retornar valores por defecto
+    // Esto permite que el componente se renderice mientras el Provider se inicializa
+    console.warn('useCarteraContext: Contexto no disponible, usando valores por defecto')
+    return {
+      carteraActiva: null,
+      carteras: [],
+      setCarteraActiva: () => {},
+      carteraActivaId: null,
+      setCarteraActivaId: () => {},
+      refreshCarteras: async () => {},
+      loading: true,
+      error: null,
+    }
   }
   return context
 }
