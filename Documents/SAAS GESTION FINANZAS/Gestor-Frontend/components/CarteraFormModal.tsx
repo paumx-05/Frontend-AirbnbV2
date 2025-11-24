@@ -26,6 +26,19 @@ const COLORES_DISPONIBLES = [
   '#f97316', // Naranja
 ]
 
+// Divisas disponibles con sus símbolos y nombres
+const DIVISAS_DISPONIBLES = [
+  { codigo: 'EUR', simbolo: '€', nombre: 'Euro', bandera: '🇪🇺' },
+  { codigo: 'USD', simbolo: '$', nombre: 'Dólar Estadounidense', bandera: '🇺🇸' },
+  { codigo: 'GBP', simbolo: '£', nombre: 'Libra Esterlina', bandera: '🇬🇧' },
+  { codigo: 'AUD', simbolo: 'A$', nombre: 'Dólar Australiano', bandera: '🇦🇺' },
+  { codigo: 'CAD', simbolo: 'C$', nombre: 'Dólar Canadiense', bandera: '🇨🇦' },
+  { codigo: 'CHF', simbolo: 'CHF', nombre: 'Franco Suizo', bandera: '🇨🇭' },
+  { codigo: 'ARS', simbolo: '$', nombre: 'Peso Argentino', bandera: '🇦🇷' },
+  { codigo: 'MXN', simbolo: '$', nombre: 'Peso Mexicano', bandera: '🇲🇽' },
+  { codigo: 'CLP', simbolo: '$', nombre: 'Peso Chileno', bandera: '🇨🇱' },
+]
+
 export default function CarteraFormModal({
   isOpen,
   onClose,
@@ -41,6 +54,7 @@ export default function CarteraFormModal({
   const [color, setColor] = useState('#3b82f6')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [monedaDropdownOpen, setMonedaDropdownOpen] = useState(false)
 
   // Cargar datos de la cartera en modo edición
   useEffect(() => {
@@ -58,8 +72,24 @@ export default function CarteraFormModal({
       setMoneda('EUR')
       setIcono('💳')
       setColor('#3b82f6')
+      setMonedaDropdownOpen(false)
     }
   }, [mode, cartera, isOpen])
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.moneda-selector-wrapper')) {
+        setMonedaDropdownOpen(false)
+      }
+    }
+
+    if (monedaDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [monedaDropdownOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,13 +123,35 @@ export default function CarteraFormModal({
           return
         }
 
+        // Construir objeto de datos, solo incluyendo campos con valores
         const data: CreateCarteraRequest = {
           nombre: nombre.trim(),
-          descripcion: descripcion.trim() || undefined,
-          saldoInicial: saldoNum,
-          moneda,
-          icono,
-          color,
+        }
+
+        // Agregar campos opcionales solo si tienen valores
+        const descripcionTrimmed = descripcion.trim()
+        if (descripcionTrimmed) {
+          data.descripcion = descripcionTrimmed
+        }
+
+        // Saldo inicial: enviar solo si es mayor a 0, o siempre si el backend lo requiere
+        if (saldoNum > 0) {
+          data.saldoInicial = saldoNum
+        } else {
+          data.saldoInicial = 0 // Enviar 0 explícitamente
+        }
+
+        // Moneda: enviar siempre (tiene default 'EUR' en el schema)
+        if (moneda) {
+          data.moneda = moneda
+        }
+
+        // Icono y color: solo si tienen valores
+        if (icono) {
+          data.icono = icono
+        }
+        if (color) {
+          data.color = color
         }
 
         await onSubmit(data)
@@ -121,6 +173,7 @@ export default function CarteraFormModal({
       setMoneda('EUR')
       setIcono('💳')
       setColor('#3b82f6')
+      setMonedaDropdownOpen(false)
       onClose()
     } catch (err: any) {
       setError(err.message || 'Error al guardar la cartera')
@@ -209,22 +262,57 @@ export default function CarteraFormModal({
             {/* Moneda (solo en crear) */}
             {mode === 'create' && (
               <div className="form-group">
-                <label htmlFor="moneda">Moneda</label>
-                <select
-                  id="moneda"
-                  value={moneda}
-                  onChange={(e) => setMoneda(e.target.value)}
-                  disabled={loading}
-                >
-                  <option value="EUR">EUR - Euro</option>
-                  <option value="USD">USD - Dólar Estadounidense</option>
-                  <option value="GBP">GBP - Libra Esterlina</option>
-                  <option value="JPY">JPY - Yen Japonés</option>
-                  <option value="CHF">CHF - Franco Suizo</option>
-                  <option value="CAD">CAD - Dólar Canadiense</option>
-                  <option value="AUD">AUD - Dólar Australiano</option>
-                  <option value="MXN">MXN - Peso Mexicano</option>
-                </select>
+                <label htmlFor="moneda">Divisa *</label>
+                <div className="moneda-selector-wrapper">
+                  <button
+                    type="button"
+                    className="moneda-selector-button"
+                    onClick={() => setMonedaDropdownOpen(!monedaDropdownOpen)}
+                    disabled={loading}
+                  >
+                    <div className="moneda-selector-selected">
+                      <span className="moneda-flag">
+                        {DIVISAS_DISPONIBLES.find(d => d.codigo === moneda)?.bandera || '💱'}
+                      </span>
+                      <div className="moneda-selector-info">
+                        <span className="moneda-codigo">{moneda}</span>
+                        <span className="moneda-nombre">
+                          {DIVISAS_DISPONIBLES.find(d => d.codigo === moneda)?.nombre || 'Seleccionar'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="moneda-selector-arrow">
+                      {monedaDropdownOpen ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {monedaDropdownOpen && (
+                    <div className="moneda-dropdown">
+                      {DIVISAS_DISPONIBLES.map((divisa) => (
+                        <button
+                          key={divisa.codigo}
+                          type="button"
+                          className={`moneda-option ${moneda === divisa.codigo ? 'selected' : ''}`}
+                          onClick={() => {
+                            setMoneda(divisa.codigo)
+                            setMonedaDropdownOpen(false)
+                          }}
+                        >
+                          <span className="moneda-flag">{divisa.bandera}</span>
+                          <div className="moneda-option-info">
+                            <span className="moneda-option-codigo">{divisa.codigo}</span>
+                            <span className="moneda-option-nombre">{divisa.nombre}</span>
+                          </div>
+                          {moneda === divisa.codigo && (
+                            <span className="moneda-check">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="form-hint">
+                  Selecciona la divisa para esta cartera
+                </span>
               </div>
             )}
 
@@ -275,6 +363,11 @@ export default function CarteraFormModal({
                   <span className="preview-nombre">{nombre || 'Nombre de la cartera'}</span>
                   {descripcion && (
                     <span className="preview-descripcion">{descripcion}</span>
+                  )}
+                  {mode === 'create' && (
+                    <span className="preview-moneda">
+                      {DIVISAS_DISPONIBLES.find(d => d.codigo === moneda)?.bandera} {moneda}
+                    </span>
                   )}
                 </div>
               </div>

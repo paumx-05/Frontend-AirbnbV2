@@ -236,10 +236,16 @@ export const carterasService = {
       } as CarteraError
     }
     
-    console.log('[CARTERAS SERVICE] Creando cartera:', {
+    console.log('[CARTERAS SERVICE] Creando cartera con datos:', {
       nombre: validated.data.nombre,
       descripcion: validated.data.descripcion,
+      saldoInicial: validated.data.saldoInicial,
+      moneda: validated.data.moneda,
+      icono: validated.data.icono,
+      color: validated.data.color,
     })
+    
+    console.log('[CARTERAS SERVICE] Datos a enviar (JSON):', JSON.stringify(validated.data, null, 2))
     
     const response = await fetchAPI<BackendCarteraResponse>(
       API_CONFIG.ENDPOINTS.CARTERAS.CREATE,

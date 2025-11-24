@@ -8309,6 +8309,256 @@ body {
   color: #64748b;
 }
 
+.preview-moneda {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Selector de Moneda Personalizado */
+.moneda-selector-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.moneda-selector-button {
+  width: 100%;
+  padding: 14px 16px;
+  background: #0f172a;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.moneda-selector-button:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: #1e293b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.moneda-selector-button:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.moneda-selector-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.moneda-selector-selected {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.moneda-flag {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.moneda-selector-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.moneda-codigo {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.5px;
+}
+
+.moneda-nombre {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.moneda-selector-arrow {
+  font-size: 12px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.moneda-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #1e293b;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  animation: dropdownFadeIn 0.2s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.moneda-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.moneda-dropdown::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 3px;
+}
+
+.moneda-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 3px;
+}
+
+.moneda-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+.moneda-option {
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.moneda-option:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+  transform: translateX(4px);
+}
+
+.moneda-option.selected {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.moneda-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.moneda-option-codigo {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.5px;
+}
+
+.moneda-option-nombre {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.moneda-check {
+  font-size: 18px;
+  color: #3b82f6;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Mejoras al formulario de cartera */
+.cartera-form .form-group {
+  position: relative;
+}
+
+.cartera-form .form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.cartera-form .form-group input,
+.cartera-form .form-group textarea {
+  width: 100%;
+  padding: 14px 16px;
+  background: #0f172a;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  color: #f8fafc;
+  font-size: 15px;
+  transition: all 0.2s ease;
+}
+
+.cartera-form .form-group input::placeholder,
+.cartera-form .form-group textarea::placeholder {
+  color: #64748b;
+}
+
+.cartera-form .form-group input:hover:not(:disabled),
+.cartera-form .form-group textarea:hover:not(:disabled) {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: #1e293b;
+}
+
+.cartera-form .form-group input:focus,
+.cartera-form .form-group textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  background: #1e293b;
+}
+
+.cartera-form .form-group input:disabled,
+.cartera-form .form-group textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cartera-form .form-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 6px;
+  display: block;
+}
+
 /* Detalle de Cartera Page */
 .cartera-detalle-header {
   background: white;

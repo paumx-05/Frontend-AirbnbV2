@@ -4,26 +4,23 @@
 // Permite al usuario cambiar entre carteras, crear nuevas y eliminar carteras
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCartera } from '@/hooks/useCartera'
 
 export default function CarteraSelector() {
+  const router = useRouter()
   const {
     carteraActiva,
     carteras,
     setCarteraActivaId,
-    createCartera,
     deleteCartera,
     loading,
   } = useCartera()
 
   const [showDropdown, setShowDropdown] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [carteraToDelete, setCarteraToDelete] = useState<string | null>(null)
   const [deleteData, setDeleteData] = useState(false)
-  const [newCarteraNombre, setNewCarteraNombre] = useState('')
-  const [newCarteraDescripcion, setNewCarteraDescripcion] = useState('')
-  const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -44,29 +41,9 @@ export default function CarteraSelector() {
     setShowDropdown(false)
   }
 
-  const handleCreateCartera = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newCarteraNombre.trim()) return
-
-    setCreating(true)
-    try {
-      const result = await createCartera({
-        nombre: newCarteraNombre.trim(),
-        descripcion: newCarteraDescripcion.trim() || undefined,
-      })
-
-      if (result.success) {
-        setShowCreateModal(false)
-        setNewCarteraNombre('')
-        setNewCarteraDescripcion('')
-      } else {
-        alert(result.error || 'Error al crear cartera')
-      }
-    } catch (error: any) {
-      alert(error.message || 'Error al crear cartera')
-    } finally {
-      setCreating(false)
-    }
+  const handleCrearNuevaCartera = () => {
+    setShowDropdown(false)
+    router.push('/dashboard/carteras')
   }
 
   const handleDeleteClick = () => {
@@ -166,10 +143,7 @@ export default function CarteraSelector() {
             <span className="dropdown-header-text">Seleccionar Cartera</span>
             <button
               type="button"
-              onClick={() => {
-                setShowCreateModal(true)
-                setShowDropdown(false)
-              }}
+              onClick={handleCrearNuevaCartera}
               className="dropdown-header-btn"
               title="Crear nueva cartera"
             >
@@ -184,10 +158,7 @@ export default function CarteraSelector() {
                 <span className="empty-icon">📭</span>
                 <p className="empty-text">No hay carteras disponibles</p>
                 <button
-                  onClick={() => {
-                    setShowCreateModal(true)
-                    setShowDropdown(false)
-                  }}
+                  onClick={handleCrearNuevaCartera}
                   className="empty-btn"
                 >
                   Crear primera cartera
@@ -254,66 +225,6 @@ export default function CarteraSelector() {
               </button>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Modal para crear nueva cartera */}
-      {showCreateModal && (
-        <div className="cartera-modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="cartera-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="cartera-modal-header">
-              <h3>Crear Nueva Cartera</h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="cartera-modal-close"
-              >
-                ×
-              </button>
-            </div>
-            <form onSubmit={handleCreateCartera} className="cartera-modal-form">
-              <div className="cartera-modal-field">
-                <label htmlFor="cartera-nombre">Nombre *</label>
-                <input
-                  id="cartera-nombre"
-                  type="text"
-                  value={newCarteraNombre}
-                  onChange={(e) => setNewCarteraNombre(e.target.value)}
-                  placeholder="Ej: Personal, Negocio, Ahorros..."
-                  required
-                  maxLength={100}
-                />
-              </div>
-              <div className="cartera-modal-field">
-                <label htmlFor="cartera-descripcion">Descripción</label>
-                <textarea
-                  id="cartera-descripcion"
-                  value={newCarteraDescripcion}
-                  onChange={(e) => setNewCarteraDescripcion(e.target.value)}
-                  placeholder="Descripción opcional de la cartera"
-                  maxLength={500}
-                  rows={3}
-                />
-              </div>
-              <div className="cartera-modal-actions">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="btn btn-secondary"
-                  disabled={creating}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={creating || !newCarteraNombre.trim()}
-                >
-                  {creating ? 'Creando...' : 'Crear Cartera'}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 
