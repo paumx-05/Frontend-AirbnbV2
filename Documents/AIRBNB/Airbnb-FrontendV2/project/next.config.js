@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // output: 'export', // Comentado: no compatible con páginas dinámicas y API routes
@@ -8,6 +10,14 @@ const nextConfig = {
   images: { unoptimized: true },
   typescript: {
     ignoreBuildErrors: false,
+  },
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    // Asegurar que los alias de paths funcionen correctamente
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, '.'),
+    };
+    return config;
   },
 };
 

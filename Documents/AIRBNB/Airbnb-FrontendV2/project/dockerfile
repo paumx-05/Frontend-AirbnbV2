@@ -16,6 +16,9 @@ RUN npm ci
 # Copiar todos los archivos del proyecto
 COPY . .
 
+# Verificar que los archivos de contexto se copiaron correctamente
+RUN ls -la context/ || echo "Warning: context directory not found"
+
 # Construir la aplicación Next.js
 RUN npm run build
 
